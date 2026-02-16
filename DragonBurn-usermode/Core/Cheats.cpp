@@ -28,6 +28,7 @@
 #include "../Features/SpectatorList.h"
 #include "../Helpers/Logger.h"
 #include "../Features/SoundESP.h"
+#include "../Features/WebRadar.h"
 
 int PreviousTotalHits = 0;
 
@@ -125,6 +126,13 @@ void Cheats::Run()
 			allEntities.push_back(pair.second);
 		}
 		SpecList::GetSpectatorList(allEntities, LocalEntity);
+		
+		// Update web radar
+		if (WebRadarCFG::Enabled && WebRadar::g_webRadar && WebRadar::g_webRadar->IsEnabled())
+		{
+			WebRadar::g_webRadar->UpdateRadarData(cachedResults, LocalEntity, LocalPlayerControllerIndex, m_currentTick);
+		}
+		
 		m_previousTick = m_currentTick;
 	}
 }

@@ -1,4 +1,4 @@
-﻿//______                            ______                  
+//______                            ______                  
 //|  _  \                           | ___ \                 
 //| | | |_ __ __ _  __ _  ___  _ __ | |_/ /_   _ _ __ _ __  
 //| | | | '__/ _` |/ _` |/ _ \| '_ \| ___ \ | | | '__| '_ \ 
@@ -17,6 +17,7 @@
 #include "Config/ConfigSaver.h"
 #include "Helpers/Logger.h"
 #include "Helpers/UIAccess.h"
+#include "Features/WebRadar.h"
 #include <filesystem>
 #include <KnownFolders.h>
 #include <ShlObj.h>
@@ -103,7 +104,12 @@ void Cheat()
 		catch (std::exception error)
 		{
 			Log::Error(error.what());
+			Log::Warning("Using fallback config directory");
+			MenuConfig::path = ".";
 		}
+
+		if (fs::exists(MenuConfig::path + "\\Data"))
+			fs::create_directories(MenuConfig::path + "\\Data");
 
 		if (fs::exists(MenuConfig::path + "\\default.cfg"))
 			MenuConfig::defaultConfig = true;
@@ -263,6 +269,20 @@ UPDATE_OFFSETS://UPDATE_OFFSETS
 	Log::Fine("Linked to CS2");
 	Log::Fine("DragonBurn loaded");
 
+	// Initialize WebRadar
+	if (WebRadarCFG::Enabled)
+	{
+		Log::Info("Initializing WebRadar...");
+		WebRadar::g_webRadar = std::make_unique<WebRadar::WebRadarManager>();
+		if (WebRadar::g_webRadar->Initialize(WebRadarCFG::Port))
+		{
+			Log::Fine("WebRadar initialized on http://localhost:" + std::to_string(WebRadarCFG::Port));
+		}
+		else
+		{
+			Log::Warning("Failed to initialize WebRadar");
+		}
+	}
 
 #ifndef DBDEBUG
 	Sleep(3000);
@@ -276,5 +296,11 @@ UPDATE_OFFSETS://UPDATE_OFFSETS
 	catch (std::exception& error)
 	{
 		Log::Error(error.what());
+	}
+	
+	// Shutdown WebRadar on exit
+	if (WebRadar::g_webRadar)
+	{
+		WebRadar::g_webRadar->Shutdown();
 	}
 }

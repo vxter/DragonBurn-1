@@ -25,6 +25,8 @@ namespace MyConfigSaver {
                 break;
             }
         }
+        if (node.is_null())
+            return defaultValue;
         value = node.get<T>();
         return value;
     }

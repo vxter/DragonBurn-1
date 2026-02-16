@@ -284,10 +284,23 @@ bool CheckArg(const int argc, wchar_t** argv, const wchar_t* arg)
 bool CheckCheatVersion()
 {
 	std::vector<std::string> versions;
-	json cloudVer = json::parse(Web::Get("https://api.jsonbin.io/v3/b/690e4759ae596e708f4b20b3"))["record"];
+	json cloudVer;
+	try {
+		std::string response = Web::Get("https://api.jsonbin.io/v3/b/690e4759ae596e708f4b20b3");
+		cloudVer = json::parse(response);
 
-	if (!cloudVer.contains("kernel-ver") || cloudVer["kernel-ver"].is_null() || !cloudVer["kernel-ver"].is_array())
-		throw std::runtime_error("Invalid json data");
+		if (!cloudVer.contains("record"))
+			throw std::runtime_error("Missing 'record' key in API response");
+
+		cloudVer = cloudVer["record"];
+
+		if (!cloudVer.contains("kernel-ver") || cloudVer["kernel-ver"].is_null() || !cloudVer["kernel-ver"].is_array())
+			throw std::runtime_error("Invalid json data");
+	} catch (const json::type_error& e) {
+		throw std::runtime_error(std::string("JSON type error: ") + e.what());
+	} catch (const std::runtime_error& e) {
+		throw std::runtime_error(std::string("API error: ") + e.what());
+	}
 
 	for (const auto& version : cloudVer["kernel-ver"])
 		versions.push_back(version.get<std::string>());

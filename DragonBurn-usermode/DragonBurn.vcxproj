@@ -22,13 +22,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -48,7 +48,7 @@
     <OutDir>$(SolutionDir)\built_dbg\</OutDir>
     <IntDir>$(SolutionDir)\built_dbg\cache\um</IntDir>
     <RunCodeAnalysis>false</RunCodeAnalysis>
-    <IncludePath>Libs\json</IncludePath>
+    <IncludePath>Libs\json;Libs\httplib</IncludePath>
     <ExternalIncludePath>$(ExternalIncludePath)</ExternalIncludePath>
     <TargetName>DragonBurn-usermode</TargetName>
     <LibraryPath>$(LibraryPath)</LibraryPath>
@@ -57,7 +57,7 @@
     <OutDir>$(SolutionDir)\built\</OutDir>
     <IntDir>$(SolutionDir)\built\cache\um</IntDir>
     <RunCodeAnalysis>false</RunCodeAnalysis>
-    <IncludePath>Libs\json</IncludePath>
+    <IncludePath>Libs\json;Libs\httplib</IncludePath>
     <ExternalIncludePath>$(ExternalIncludePath)</ExternalIncludePath>
     <TargetName>DragonBurn-usermode</TargetName>
     <LibraryPath>$(LibraryPath)</LibraryPath>
@@ -116,6 +116,8 @@
     <ClInclude Include="Features\SoundESP.h" />
     <ClInclude Include="Features\SpectatorList.h" />
     <ClInclude Include="Features\TriggerBot.h" />
+    <ClInclude Include="Features\WebRadar.h" />
+    <ClInclude Include="WebServer\WebServer.h" />
     <ClInclude Include="Game\Bone.h" />
     <ClInclude Include="Game\Entity.h" />
     <ClInclude Include="Game\Game.h" />
@@ -163,6 +165,8 @@
     <ClCompile Include="Features\Radar.cpp" />
     <ClCompile Include="Features\RCS.cpp" />
     <ClCompile Include="Features\TriggerBot.cpp" />
+    <ClCompile Include="Features\WebRadar.cpp" />
+    <ClCompile Include="WebServer\WebServer.cpp" />
     <ClCompile Include="Game\Bone.cpp" />
     <ClCompile Include="Game\Entity.cpp" />
     <ClCompile Include="Game\Game.cpp" />

@@ -1,10 +1,11 @@
-﻿#pragma once
+#pragma once
 #include "..\Core\Config.h"
 #include "..\Core\Render.h"
 #include "..\Features\Aimbot.h"
 #include "..\Features\Radar.h"
 #include "..\Features\Misc.h"
 #include "..\Features\TriggerBot.h"
+#include "..\Features\WebRadar.h"
 #include "..\Config\ConfigMenu.h"
 #include "..\Config\ConfigSaver.h"
 
@@ -399,6 +400,28 @@ namespace GUI
 							PutSliderFloat(Text::Radar::RangeSlider.c_str(), 5.f, &RadarCFG::RadarRange, &RadarRangeMin, &RadarRangeMax, "%.1f");
 							PutSliderFloat(Text::Radar::AlphaSlider.c_str(), 5.f, &RadarCFG::RadarBgAlpha, &AlphaMin, &AlphaMax, "%.1f");
 						}
+					}
+					
+					ImGui::NewLine();
+					ImGui::SeparatorText("WebRadar");
+					PutSwitch("Enable WebRadar", 5.f, ImGui::GetFrameHeight() * 1.7, &WebRadarCFG::Enabled);
+					if (WebRadarCFG::Enabled)
+					{
+						if (!WebRadar::g_webRadar || !WebRadar::g_webRadar->IsEnabled())
+						{
+							if (!WebRadar::g_webRadar)
+								WebRadar::g_webRadar = std::make_unique<WebRadar::WebRadarManager>();
+							WebRadar::g_webRadar->Initialize(WebRadarCFG::Port);
+						}
+						ImGui::TextWrapped("WebRadar is running on http://localhost:%d", WebRadarCFG::Port);
+						ImGui::TextWrapped("Open this URL in your web browser to view the radar.");
+						static const int PortMin = 8000, PortMax = 9999;
+						PutSliderInt("Port", 5.f, &WebRadarCFG::Port, &PortMin, &PortMax, "%d");
+					}
+					else
+					{
+						if (WebRadar::g_webRadar && WebRadar::g_webRadar->IsEnabled())
+							WebRadar::g_webRadar->Shutdown();
 					}
 					
 					//ImGui::NewLine();
