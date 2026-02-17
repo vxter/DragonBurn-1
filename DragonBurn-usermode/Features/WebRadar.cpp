@@ -89,8 +89,26 @@ namespace WebRadar
 
         // Collect player data
         std::vector<PlayerData> players;
-        players.reserve(entities.size());
+        players.reserve(entities.size() + 1); // +1 for local player
 
+        // Add local player first (if alive)
+        if (localEntity.IsAlive())
+        {
+            PlayerData localPlayer;
+            localPlayer.position = localEntity.Pawn.Pos;
+            localPlayer.cameraPos = localEntity.Pawn.CameraPos;
+            localPlayer.health = localEntity.Pawn.Health;
+            localPlayer.teamId = localEntity.Pawn.TeamID;
+            localPlayer.weaponName = std::string(localEntity.Pawn.WeaponName);
+            localPlayer.playerName = std::string(localEntity.Controller.PlayerName);
+            localPlayer.viewAngle = localEntity.Pawn.ViewAngle;
+            localPlayer.entityIndex = localPlayerControllerIndex;
+            localPlayer.isLocalPlayer = true;
+            
+            players.push_back(localPlayer);
+        }
+
+        // Add other players
         for (const auto& [entityIndex, entity] : entities)
         {
             if (!entity.IsAlive())
@@ -105,6 +123,7 @@ namespace WebRadar
             player.playerName = std::string(entity.Controller.PlayerName);
             player.viewAngle = entity.Pawn.ViewAngle;
             player.entityIndex = entityIndex;
+            player.isLocalPlayer = false;
 
             players.push_back(player);
         }
@@ -117,7 +136,7 @@ namespace WebRadar
         mapData.offsetY = WebRadarCFG::OffsetY;
 
         // Build and send JSON
-        std::string json = BuildJSON(players, mapData, localEntity.Controller.TeamID, tickCount);
+        std::string json = BuildJSON(players, mapData, localEntity.Controller.TeamID, tickCount, localPlayerControllerIndex);
         m_server->UpdateRadarData(json);
     }
 
@@ -142,7 +161,8 @@ namespace WebRadar
         const std::vector<PlayerData>& players,
         const MapData& mapData,
         int localTeamId,
-        DWORD tickCount)
+        DWORD tickCount,
+        int localPlayerIndex)
     {
         std::ostringstream json;
         json << std::fixed << std::setprecision(2);
@@ -159,6 +179,9 @@ namespace WebRadar
 
         // Local team ID
         json << "\"localTeamId\":" << localTeamId << ",";
+
+        // Local player index
+        json << "\"localPlayerIndex\":" << localPlayerIndex << ",";
 
         // Tick count
         json << "\"tickCount\":" << tickCount << ",";
@@ -188,7 +211,8 @@ namespace WebRadar
             json << "\"health\":" << player.health << ",";
             json << "\"teamId\":" << player.teamId << ",";
             json << "\"weaponName\":\"" << player.weaponName << "\",";
-            json << "\"name\":\"" << player.playerName << "\"";
+            json << "\"name\":\"" << player.playerName << "\",";
+            json << "\"isLocalPlayer\":" << (player.isLocalPlayer ? "true" : "false");
             json << "}";
 
             if (i < players.size() - 1)

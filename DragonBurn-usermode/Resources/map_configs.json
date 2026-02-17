@@ -1,0 +1,72 @@
+{
+  "de_dust2": {
+    "resolution": 4.40,
+    "offset": {
+      "x": 2470,
+      "y": 1255
+    }
+  },
+  "de_mirage": {
+    "resolution": 5.02,
+    "offset": {
+      "x": 3240,
+      "y": 3410
+    }
+  },
+  "de_inferno": {
+    "resolution": 4.91,
+    "offset": {
+      "x": 2090,
+      "y": 1150
+    }
+  },
+  "de_nuke": {
+    "resolution": 6.98,
+    "offset": {
+      "x": 3290,
+      "y": 5990
+    }
+  },
+  "de_ancient": {
+    "resolution": 4.26,
+    "offset": {
+      "x": 2590,
+      "y": 2520
+    }
+  },
+  "de_anubis": {
+    "resolution": 5.25,
+    "offset": {
+      "x": 2830,
+      "y": 2030
+    }
+  },
+  "de_vertigo": {
+    "resolution": 4.96,
+    "offset": {
+      "x": 3890,
+      "y": 3800
+    }
+  },
+  "de_overpass": {
+    "resolution": 5.20,
+    "offset": {
+      "x": 4820,
+      "y": 3565
+    }
+  },
+  "de_train": {
+    "resolution": 4.50,
+    "offset": {
+      "x": 2470,
+      "y": 2390
+    }
+  },
+  "de_cache": {
+    "resolution": 5.50,
+    "offset": {
+      "x": 2000,
+      "y": 2000
+    }
+  }
+}

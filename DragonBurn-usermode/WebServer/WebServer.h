@@ -22,6 +22,8 @@ namespace WebRadar
 
     private:
         void ServerThread();
+        std::string ReadMapBackgroundsConfig();
+        bool WriteMapBackgroundsConfig(const std::string& jsonContent);
         
         std::atomic<bool> m_running;
         std::atomic<bool> m_shouldStop;

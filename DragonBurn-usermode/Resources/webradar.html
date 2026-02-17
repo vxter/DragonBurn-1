@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DragonBurn WebRadar</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0e1a; color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        #header { background: linear-gradient(135deg, #1a1f35, #2d3555); padding: 15px 20px; border-bottom: 2px solid #3d4975; display: flex; justify-content: space-between; align-items: center; }
+        #header h1 { font-size: 24px; color: #4a9eff; text-shadow: 0 0 10px rgba(74,158,255,0.5); }
+        #status { display: flex; gap: 20px; align-items: center; }
+        .status-item { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ff4444; box-shadow: 0 0 10px rgba(255,68,68,0.5); }
+        .status-dot.connected { background: #44ff44; box-shadow: 0 0 10px rgba(68,255,68,0.5); }
+        #container { display: flex; flex-direction: column; justify-content: center; align-items: center; height: calc(100vh - 62px); padding: 20px; gap: 15px; }
+        #controls-top { display: flex; gap: 10px; align-items: center; width: 100%; max-width: min(90vw, 90vh); justify-content: space-between; }
+        #rotation-controls { display: flex; gap: 5px; }
+        .rotation-btn { background: #4a9eff; color: #000; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .rotation-btn:hover { background: #6ab3ff; }
+        #info-display { display: flex; gap: 20px; align-items: center; font-size: 14px; }
+        #info-display .info-item { display: flex; gap: 5px; }
+        #info-display .label { color: #888; }
+        #info-display .value { color: #4a9eff; font-weight: bold; }
+        #radar-container { position: relative; width: min(90vw, 90vh); height: min(90vw, 90vh); max-width: 1024px; max-height: 1024px; background: #0f1419; border: 2px solid #3d4975; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+        #radar { width: 100%; height: 100%; display: block; image-rendering: crisp-edges; }
+        #settings-btn { position: fixed; bottom: 20px; right: 20px; background: #4a9eff; color: #000; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; z-index: 100; }
+        #settings-btn:hover { background: #6ab3ff; }
+        
+        @media (max-width: 768px) {
+            #controls-top { flex-direction: column; gap: 10px; }
+            #info-display { flex-wrap: wrap; justify-content: center; }
+        }
+        #settings-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        #settings-modal.active { display: flex; }
+        #settings-content { background: #1a1f35; border: 2px solid #3d4975; border-radius: 8px; padding: 20px; max-width: 600px; max-height: 80vh; overflow-y: auto; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+        .settings-title { font-size: 20px; color: #4a9eff; margin-bottom: 15px; font-weight: bold; }
+        .settings-group { margin-bottom: 15px; }
+        .settings-group label { display: block; color: #aaa; font-size: 12px; margin-bottom: 5px; }
+        .settings-group input { width: 100%; padding: 8px; background: #0f1419; border: 1px solid #3d4975; color: #fff; border-radius: 4px; box-sizing: border-box; }
+        .settings-group input:focus { outline: none; border-color: #4a9eff; }
+        .button-group { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+        .button-group button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .save-btn { background: #44ff44; color: #000; }
+        .save-btn:hover { background: #66ff66; }
+        .cancel-btn { background: #666; color: #fff; }
+        .cancel-btn:hover { background: #888; }
+        .settings-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #3d4975; }
+        .tab-btn { background: none; border: none; color: #aaa; padding: 10px 15px; cursor: pointer; font-weight: bold; font-size: 14px; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .tab-btn:hover { color: #fff; }
+        .tab-btn.active { color: #4a9eff; border-bottom-color: #4a9eff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .player-color-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px; background: #0f1419; border: 1px solid #3d4975; border-radius: 4px; }
+        .player-color-item .player-name { flex: 1; color: #fff; font-size: 14px; }
+        .player-color-item .reset-btn { background: #666; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .player-color-item .reset-btn:hover { background: #888; }
+        .player-color-item .set-color-btn { background: #4a9eff; color: #000; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .player-color-item .set-color-btn:hover { background: #6ab3ff; }
+        .color-swatch { width: 30px; height: 30px; border-radius: 4px; border: 2px solid #3d4975; }
+        .color-palette { position: fixed; background: #1a1f35; border: 2px solid #3d4975; border-radius: 8px; padding: 15px; box-shadow: 0 0 30px rgba(0,0,0,0.8); z-index: 2000; display: none; }
+        .color-palette.active { display: block; }
+        .color-palette-title { color: #4a9eff; font-weight: bold; margin-bottom: 10px; font-size: 14px; }
+        .color-palette-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .color-palette-option { width: 50px; height: 50px; border-radius: 6px; cursor: pointer; border: 2px solid #3d4975; transition: transform 0.1s, border-color 0.1s; }
+        .color-palette-option:hover { transform: scale(1.1); border-color: #fff; }
+        .no-players { color: #888; text-align: center; padding: 20px; font-style: italic; }
+        .clear-all-btn { background: #ff4444; color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px; width: 100%; }
+        .clear-all-btn:hover { background: #ff6666; }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>DragonBurn WebRadar</h1>
+        <div id="status">
+            <div class="status-item"><div class="status-dot" id="connection-status"></div><span id="connection-text">Connecting...</span></div>
+            <div class="status-item"><span>FPS: <span id="fps">0</span></span></div>
+            <div class="status-item"><span>Players: <span id="player-count">0</span></span></div>
+        </div>
+    </div>
+    <div id="container">
+        <div id="controls-top">
+            <div id="rotation-controls">
+                <button class="rotation-btn" id="rotate-ccw">↶ 90°</button>
+                <button class="rotation-btn" id="rotate-cw">↷ 90°</button>
+            </div>
+            <div id="info-display">
+                <div class="info-item"><span class="label">Map:</span><span class="value" id="map-name">Unknown</span></div>
+                <div class="info-item"><span class="label">Allies:</span><span class="value" id="ally-count" style="color: #4a9eff;">0</span></div>
+                <div class="info-item"><span class="label">Enemies:</span><span class="value" id="enemy-count" style="color: #ff4444;">0</span></div>
+            </div>
+        </div>
+        <div id="radar-container">
+            <canvas id="radar" width="1024" height="1024"></canvas>
+        </div>
+    </div>
+    <button id="settings-btn">⚙️ Settings</button>
+
+    <div id="color-palette" class="color-palette">
+        <div class="color-palette-title">Choose Color</div>
+        <div class="color-palette-grid" id="color-palette-grid"></div>
+    </div>
+
+    <div id="settings-modal">
+        <div id="settings-content">
+            <div class="settings-title">Settings</div>
+            <div class="settings-tabs">
+                <button class="tab-btn active" data-tab="map-tab">Map Backgrounds</button>
+                <button class="tab-btn" data-tab="colors-tab">Player Colors</button>
+            </div>
+            <div id="map-tab" class="tab-content active">
+                <div id="map-inputs-container"></div>
+            </div>
+            <div id="colors-tab" class="tab-content">
+                <div id="player-colors-container"></div>
+            </div>
+            <div class="button-group">
+                <button class="cancel-btn" id="cancel-btn">Cancel</button>
+                <button class="save-btn" id="save-btn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('radar');
+        const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+        let lastFrameTime = Date.now();
+        let frameCount = 0;
+        let fps = 0;
+        let MAP_SCALE = 4.4;
+        let MAP_OFFSET_X = 0;
+        let MAP_OFFSET_Y = 0;
+        let currentMapName = '';
+        let currentBgImage = null;
+        let mapRotation = 0; // 0, 90, 180, 270 degrees
+
+        // Rotation controls
+        document.getElementById('rotate-cw').addEventListener('click', function() {
+            mapRotation = (mapRotation + 90) % 360;
+        });
+        document.getElementById('rotate-ccw').addEventListener('click', function() {
+            mapRotation = (mapRotation - 90 + 360) % 360;
+        });
+
+        let MAP_BACKGROUNDS = {};
+        let MAP_CONFIGS = {}; // Pre-calibrated map coordinate configs
+        let PLAYER_COLORS = {}; // Custom player colors: { playerName: "#hexcolor" }
+        let seenPlayers = new Set(); // Track all players we've seen
+        
+        // Position interpolation for smoother movement
+        let lastPlayerData = null;
+        let currentPlayerData = null;
+        let lastUpdateTime = 0;
+        let interpolationEnabled = true;
+        
+        // Preset color palette (12 distinct colors)
+        const COLOR_PALETTE = [
+            '#ff00ff', // Magenta
+            '#ffff00', // Yellow
+            '#00ffff', // Cyan
+            '#ff8800', // Orange
+            '#ff0088', // Hot Pink
+            '#88ff00', // Lime
+            '#8800ff', // Purple
+            '#00ff88', // Spring Green
+            '#ff0000', // Red (brighter than enemy)
+            '#00ff00', // Green (brighter than local)
+            '#0088ff', // Light Blue
+            '#ffffff'  // White
+        ];
+
+        // Fetch map backgrounds configuration from server
+        async function loadMapBackgroundsConfig() {
+            try {
+                const response = await fetch('/api/map-backgrounds');
+                if (response.ok) {
+                    MAP_BACKGROUNDS = await response.json();
+                } else {
+                    console.error('Failed to load map backgrounds config');
+                }
+            } catch (e) {
+                console.error('Error loading map backgrounds:', e);
+            }
+        }
+
+        // Fetch pre-calibrated map coordinate configs
+        async function loadMapConfigs() {
+            try {
+                const response = await fetch('/map_configs.json');
+                if (response.ok) {
+                    MAP_CONFIGS = await response.json();
+                    console.log('✓ Loaded map configs for:', Object.keys(MAP_CONFIGS).join(', '));
+                } else {
+                    console.error('✗ Failed to load map configs');
+                }
+            } catch (e) {
+                console.error('✗ Error loading map configs:', e);
+            }
+        }
+
+        // Initialize color palette
+        const colorPalette = document.getElementById('color-palette');
+        const colorPaletteGrid = document.getElementById('color-palette-grid');
+        let currentColorPickerPlayer = null;
+        
+        COLOR_PALETTE.forEach(color => {
+            const option = document.createElement('div');
+            option.className = 'color-palette-option';
+            option.style.backgroundColor = color;
+            option.onclick = () => {
+                if (currentColorPickerPlayer) {
+                    PLAYER_COLORS[currentColorPickerPlayer] = color;
+                    colorPalette.classList.remove('active');
+                    populatePlayerColorsUI();
+                }
+            };
+            colorPaletteGrid.appendChild(option);
+        });
+        
+        // Close color palette when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!colorPalette.contains(e.target) && !e.target.classList.contains('set-color-btn') && !e.target.classList.contains('color-swatch')) {
+                colorPalette.classList.remove('active');
+            }
+        });
+        
+        // Load configs on page load
+        loadMapBackgroundsConfig();
+        loadMapConfigs();
+
+        function updateMapBackground(mapName) {
+            if (!mapName) return;
+            let normalizedName = mapName.toLowerCase().trim();
+            const lastSlash = normalizedName.lastIndexOf('/');
+            if (lastSlash >= 0) normalizedName = normalizedName.substring(lastSlash + 1);
+            const lastDot = normalizedName.lastIndexOf('.');
+            if (lastDot >= 0) normalizedName = normalizedName.substring(0, lastDot);
+            if (!normalizedName.startsWith('de_') && !normalizedName.startsWith('cs_')) normalizedName = 'de_' + normalizedName;
+            
+            // Check if map already processed AND config already applied
+            const configAlreadyApplied = (normalizedName === currentMapName) && 
+                                         (MAP_OFFSET_X !== 0 || MAP_OFFSET_Y !== 0);
+            if (configAlreadyApplied) {
+                return;
+            }
+            
+            currentMapName = normalizedName;
+            
+            // Apply pre-calibrated map config if available
+            if (MAP_CONFIGS[normalizedName]) {
+                const config = MAP_CONFIGS[normalizedName];
+                MAP_SCALE = config.resolution;
+                MAP_OFFSET_X = config.offset.x;
+                MAP_OFFSET_Y = config.offset.y;
+                
+                console.log(`✓ Applied config for ${normalizedName}: scale=${MAP_SCALE}, offset=(${MAP_OFFSET_X}, ${MAP_OFFSET_Y})`);
+            }
+            
+            const bgUrl = MAP_BACKGROUNDS[normalizedName];
+            document.getElementById('map-name').textContent = normalizedName;
+            if (bgUrl && bgUrl.length > 10 && bgUrl !== 'URL_HERE') {
+                const img = new Image();
+                // Try without crossOrigin first (for same-origin images)
+                img.src = bgUrl;
+                img.onload = function() { 
+                    currentBgImage = img;
+                    console.log('✓ Loaded background for ' + normalizedName);
+                };
+                img.onerror = function() { 
+                    currentBgImage = null;
+                    console.warn('⚠ Failed to load background image for ' + normalizedName + ' (CORS or 404)');
+                    console.warn('  Using solid color background instead.');
+                };
+            } else { 
+                currentBgImage = null; 
+            }
+        }
+
+        function worldToRadar(worldX, worldY) {
+            // CS2 Radar Transformation (based on boltobserv):
+            // Formula: radarPos = (worldPos + offset) / resolution
+            // The offset shifts world origin to radar bottom-left
+            // The resolution converts game units to pixels
+            
+            // Step 1: Apply offset (shifts world origin to bottom-left of radar)
+            const gameX = worldX + MAP_OFFSET_X;
+            const gameY = worldY + MAP_OFFSET_Y;
+            
+            // Step 2: Convert game units to pixels
+            const pixelX = gameX / MAP_SCALE;
+            const pixelY = gameY / MAP_SCALE;
+            
+            // Step 3: Invert Y-axis (canvas Y increases downward, game Y increases upward)
+            const canvasY = 1024 - pixelY;
+            
+            const clampedX = Math.max(0, Math.min(1024, Math.floor(pixelX)));
+            const clampedY = Math.max(0, Math.min(1024, Math.floor(canvasY)));
+            return { x: clampedX, y: clampedY };
+        }
+
+        function drawPlayer(x, y, isAlly, health, isLocalPlayer, viewAngle, playerName) {
+            // Check for custom color first, otherwise use default colors
+            // Only use custom color if it exists in PLAYER_COLORS object
+            let color;
+            if (playerName && playerName in PLAYER_COLORS && PLAYER_COLORS[playerName]) {
+                color = PLAYER_COLORS[playerName];
+            } else {
+                // Default colors: Green for local player, Blue for allies, Red for enemies
+                color = isLocalPlayer ? '#44ff44' : (isAlly ? '#4a9eff' : '#ff4444');
+            }
+            
+            // Draw view direction line first (behind the dot)
+            if (viewAngle !== undefined && viewAngle.y !== undefined) {
+                // Convert CS2 yaw angle to radians
+                // CS2 uses: 0° = East, 90° = North, 180° = West, 270° = South
+                // Canvas uses: 0° = East, 90° = South (Y inverted)
+                // Don't add mapRotation here - the canvas rotation handles it
+                const angleRad = (viewAngle.y * Math.PI / 180);
+                const lineLength = 20; // pixels
+                
+                const endX = x + Math.cos(angleRad) * lineLength;
+                const endY = y - Math.sin(angleRad) * lineLength; // Negative because canvas Y is inverted
+                
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+            }
+            
+            // Draw player dot
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = color;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(x, y, 8, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // Interpolate between two positions for smoother movement
+        function interpolatePosition(oldPos, newPos, alpha) {
+            if (!oldPos) return newPos;
+            return {
+                x: oldPos.x + (newPos.x - oldPos.x) * alpha,
+                y: oldPos.y + (newPos.y - oldPos.y) * alpha,
+                z: oldPos.z + (newPos.z - oldPos.z) * alpha
+            };
+        }
+
+        function render(data) {
+            ctx.clearRect(0, 0, 1024, 1024);
+            
+            // Apply rotation to entire canvas (background + dots)
+            ctx.save();
+            ctx.translate(512, 512);
+            ctx.rotate(-mapRotation * Math.PI / 180);
+            ctx.translate(-512, -512);
+            
+            // Draw background
+            if (currentBgImage && currentBgImage.complete && currentBgImage.naturalWidth > 0) {
+                ctx.drawImage(currentBgImage, 0, 0, 1024, 1024);
+            } else {
+                ctx.fillStyle = '#1a1f35';
+                ctx.fillRect(0, 0, 1024, 1024);
+            }
+            if (!data || !data.players || !Array.isArray(data.players)) {
+                ctx.restore();
+                return;
+            }
+            
+            // Calculate interpolation factor for smoother movement
+            const now = Date.now();
+            const timeSinceUpdate = now - lastUpdateTime;
+            const expectedInterval = 33; // Expected ~30ms between updates
+            const alpha = Math.min(timeSinceUpdate / expectedInterval, 1.0);
+            
+            let allyCount = 0, enemyCount = 0;
+            
+            data.players.forEach((player, idx) => {
+                // Track all players we've seen (field is "name" in JSON)
+                if (player.name) {
+                    seenPlayers.add(player.name);
+                }
+                
+                // Get interpolated position if we have previous data
+                let position = player.position;
+                if (interpolationEnabled && lastPlayerData && lastPlayerData.players) {
+                    const lastPlayer = lastPlayerData.players.find(p => p.entityIndex === player.entityIndex);
+                    if (lastPlayer) {
+                        position = interpolatePosition(lastPlayer.position, player.position, alpha);
+                    }
+                }
+                
+                const pos = worldToRadar(position.x, position.y);
+                const isOnCanvas = pos.x >= 0 && pos.x <= 1024 && pos.y >= 0 && pos.y <= 1024;
+                if (isOnCanvas) {
+                    drawPlayer(pos.x, pos.y, player.teamId === data.localTeamId, player.health, player.isLocalPlayer || false, player.viewAngle, player.name);
+                }
+                if (player.teamId === data.localTeamId) allyCount++; else enemyCount++;
+            });
+            // Restore canvas context after drawing everything
+            ctx.restore();
+            
+            // Only update DOM when counts change to avoid reflow
+            const allySpan = document.getElementById('ally-count');
+            const enemySpan = document.getElementById('enemy-count');
+            if (allySpan.textContent !== allyCount.toString()) allySpan.textContent = allyCount;
+            if (enemySpan.textContent !== enemyCount.toString()) enemySpan.textContent = enemyCount;
+            
+            frameCount++;
+            if (now - lastFrameTime >= 1000) {
+                fps = Math.round(frameCount * 1000 / (now - lastFrameTime));
+                document.getElementById('fps').textContent = fps;
+                frameCount = 0;
+                lastFrameTime = now;
+            }
+        }
+
+        // Settings modal functionality
+        const modal = document.getElementById('settings-modal');
+        const settingsBtn = document.getElementById('settings-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const saveBtn = document.getElementById('save-btn');
+        const mapInputsContainer = document.getElementById('map-inputs-container');
+
+        // Tab switching functionality
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active class from all tabs and contents
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // Add active class to clicked tab and corresponding content
+                btn.classList.add('active');
+                const tabId = btn.dataset.tab;
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // Function to populate player colors UI
+        function populatePlayerColorsUI() {
+            const container = document.getElementById('player-colors-container');
+            container.innerHTML = '';
+            
+            if (seenPlayers.size === 0) {
+                container.innerHTML = '<div class="no-players">No players detected yet. Join a game to see players.</div>';
+                return;
+            }
+            
+            // Add "Clear All Colors" button
+            const clearAllBtn = document.createElement('button');
+            clearAllBtn.className = 'clear-all-btn';
+            clearAllBtn.textContent = 'Clear All Custom Colors';
+            clearAllBtn.onclick = () => {
+                PLAYER_COLORS = {};
+                populatePlayerColorsUI();
+            };
+            container.appendChild(clearAllBtn);
+            
+            // Sort players alphabetically
+            const sortedPlayers = Array.from(seenPlayers).sort();
+            
+            sortedPlayers.forEach(playerName => {
+                const item = document.createElement('div');
+                item.className = 'player-color-item';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'player-name';
+                nameSpan.textContent = playerName;
+                
+                item.appendChild(nameSpan);
+                
+                // Check if player has custom color
+                if (playerName in PLAYER_COLORS) {
+                    // Show color swatch and reset button
+                    const colorSwatch = document.createElement('div');
+                    colorSwatch.className = 'color-swatch';
+                    colorSwatch.style.backgroundColor = PLAYER_COLORS[playerName];
+                    colorSwatch.style.cursor = 'pointer';
+                    colorSwatch.onclick = (e) => {
+                        currentColorPickerPlayer = playerName;
+                        const rect = e.target.getBoundingClientRect();
+                        colorPalette.style.left = Math.min(rect.left, window.innerWidth - 250) + 'px';
+                        colorPalette.style.top = (rect.bottom + 5) + 'px';
+                        colorPalette.classList.add('active');
+                    };
+                    
+                    const resetBtn = document.createElement('button');
+                    resetBtn.className = 'reset-btn';
+                    resetBtn.textContent = 'Reset';
+                    resetBtn.onclick = () => {
+                        delete PLAYER_COLORS[playerName];
+                        populatePlayerColorsUI();
+                    };
+                    
+                    item.appendChild(colorSwatch);
+                    item.appendChild(resetBtn);
+                } else {
+                    // Show "Set Color" button
+                    const setColorBtn = document.createElement('button');
+                    setColorBtn.className = 'set-color-btn';
+                    setColorBtn.textContent = 'Set Color';
+                    setColorBtn.onclick = (e) => {
+                        currentColorPickerPlayer = playerName;
+                        const rect = e.target.getBoundingClientRect();
+                        colorPalette.style.left = Math.min(rect.left, window.innerWidth - 250) + 'px';
+                        colorPalette.style.top = (rect.bottom + 5) + 'px';
+                        colorPalette.classList.add('active');
+                    };
+                    
+                    item.appendChild(setColorBtn);
+                }
+                
+                container.appendChild(item);
+            });
+        }
+
+        settingsBtn.addEventListener('click', () => {
+            // Populate map backgrounds tab
+            mapInputsContainer.innerHTML = '';
+            for (const [mapName, url] of Object.entries(MAP_BACKGROUNDS)) {
+                const group = document.createElement('div');
+                group.className = 'settings-group';
+                
+                const label = document.createElement('label');
+                label.textContent = mapName;
+                
+                const inputContainer = document.createElement('div');
+                inputContainer.style.display = 'flex';
+                inputContainer.style.gap = '5px';
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = url;
+                input.dataset.mapName = mapName;
+                input.placeholder = 'Enter image URL (1024x1024 PNG/JPG)';
+                input.style.flex = '1';
+                
+                const downloadBtn = document.createElement('button');
+                downloadBtn.textContent = '⬇ Download';
+                downloadBtn.className = 'save-btn';
+                downloadBtn.style.padding = '8px 12px';
+                downloadBtn.style.fontSize = '12px';
+                downloadBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    const imageUrl = input.value;
+                    if (!imageUrl || imageUrl.length < 10 || imageUrl === 'URL_HERE') {
+                        alert('Please enter a valid image URL first');
+                        return;
+                    }
+                    
+                    downloadBtn.disabled = true;
+                    downloadBtn.textContent = '⏳ Downloading...';
+                    
+                    try {
+                        const response = await fetch('/api/download-map-image', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ mapName: mapName, imageUrl: imageUrl })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (response.ok) {
+                            input.value = result.localPath;
+                            downloadBtn.textContent = '✓ Downloaded';
+                            setTimeout(() => {
+                                downloadBtn.textContent = '⬇ Download';
+                                downloadBtn.disabled = false;
+                            }, 2000);
+                        } else {
+                            alert('Download failed: ' + result.error);
+                            downloadBtn.textContent = '⬇ Download';
+                            downloadBtn.disabled = false;
+                        }
+                    } catch (e) {
+                        alert('Download error: ' + e.message);
+                        downloadBtn.textContent = '⬇ Download';
+                        downloadBtn.disabled = false;
+                    }
+                };
+                
+                inputContainer.appendChild(input);
+                inputContainer.appendChild(downloadBtn);
+                group.appendChild(label);
+                group.appendChild(inputContainer);
+                mapInputsContainer.appendChild(group);
+            }
+            
+            // Populate player colors tab
+            populatePlayerColorsUI();
+            
+            modal.classList.add('active');
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            modal.classList.remove('active');
+        });
+
+        saveBtn.addEventListener('click', async () => {
+            // Save map backgrounds
+            const updatedConfig = {};
+            document.querySelectorAll('#map-inputs-container input').forEach(input => {
+                updatedConfig[input.dataset.mapName] = input.value;
+            });
+
+            try {
+                const response = await fetch('/api/map-backgrounds', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedConfig)
+                });
+
+                if (response.ok) {
+                    MAP_BACKGROUNDS = updatedConfig;
+                    console.log('Configuration saved successfully');
+                    modal.classList.remove('active');
+                    // Reload current map background if needed
+                    if (currentMapName) {
+                        updateMapBackground(currentMapName);
+                    }
+                } else {
+                    alert('Failed to save map backgrounds configuration');
+                }
+            } catch (e) {
+                console.error('Error saving config:', e);
+                alert('Error saving configuration: ' + e.message);
+            }
+        });
+
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        });
+
+        // Animation loop for smooth interpolation
+        function animationLoop() {
+            if (currentPlayerData) {
+                render(currentPlayerData);
+            }
+            requestAnimationFrame(animationLoop);
+        }
+        
+        const eventSource = new EventSource('/events');
+        eventSource.onopen = () => { 
+            document.getElementById('connection-status').classList.add('connected'); 
+            document.getElementById('connection-text').textContent = 'Connected'; 
+        };
+        eventSource.onerror = () => { 
+            document.getElementById('connection-status').classList.remove('connected'); 
+            document.getElementById('connection-text').textContent = 'Disconnected'; 
+        };
+        eventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.map && data.map.name) updateMapBackground(data.map.name);
+                
+                // Update player data for interpolation
+                lastPlayerData = currentPlayerData;
+                currentPlayerData = data;
+                lastUpdateTime = Date.now();
+                
+                // Don't render here - let the animation loop handle it
+            } catch (e) { console.error('Parse error:', e); }
+        };
+        
+        // Start animation loop
+        currentPlayerData = {};
+        animationLoop();
+    </script>
+</body>
+</html>

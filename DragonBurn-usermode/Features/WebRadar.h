@@ -26,6 +26,7 @@ namespace WebRadar
         std::string playerName;
         Vec2 viewAngle;
         int entityIndex;
+        bool isLocalPlayer;
     };
 
     struct MapData
@@ -59,7 +60,8 @@ namespace WebRadar
             const std::vector<PlayerData>& players,
             const MapData& mapData,
             int localTeamId,
-            DWORD tickCount);
+            DWORD tickCount,
+            int localPlayerIndex);
 
         std::unique_ptr<WebServer> m_server;
         bool m_initialized;
