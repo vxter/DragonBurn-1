@@ -31,9 +31,9 @@
             #controls-top { flex-direction: column; gap: 10px; }
             #info-display { flex-wrap: wrap; justify-content: center; }
         }
-        #settings-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        #settings-modal { display: none; position: fixed; top: 0; right: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: flex-end; align-items: flex-start; }
         #settings-modal.active { display: flex; }
-        #settings-content { background: #1a1f35; border: 2px solid #3d4975; border-radius: 8px; padding: 20px; max-width: 600px; max-height: 80vh; overflow-y: auto; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+        #settings-content { background: #1a1f35; border: 2px solid #3d4975; border-radius: 8px; padding: 20px; max-width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
         .settings-title { font-size: 20px; color: #4a9eff; margin-bottom: 15px; font-weight: bold; }
         .settings-group { margin-bottom: 15px; }
         .settings-group label { display: block; color: #aaa; font-size: 12px; margin-bottom: 5px; }
@@ -49,6 +49,19 @@
         .tab-btn { background: none; border: none; color: #aaa; padding: 10px 15px; cursor: pointer; font-weight: bold; font-size: 14px; border-bottom: 2px solid transparent; margin-bottom: -2px; }
         .tab-btn:hover { color: #fff; }
         .tab-btn.active { color: #4a9eff; border-bottom-color: #4a9eff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        #calibration-inputs-container { padding: 10px; }
+        .calibration-group { margin-bottom: 20px; }
+        .calibration-group label { display: block; color: #aaa; font-size: 14px; margin-bottom: 8px; font-weight: bold; }
+        .calibration-description { color: #888; font-size: 12px; margin-bottom: 15px; line-height: 1.4; }
+        .calibration-hint { color: #666; font-size: 11px; margin-top: 5px; font-style: italic; }
+        #current-cal-map-name { color: #4a9eff; font-weight: bold; }
+        .calibration-group input[type="range"] { width: 100%; height: 6px; background: #0f1419; border: 1px solid #3d4975; border-radius: 3px; outline: none; -webkit-appearance: none; }
+        .calibration-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #4a9eff; border-radius: 50%; cursor: pointer; border: 2px solid #fff; }
+        .calibration-group input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; background: #4a9eff; border-radius: 50%; cursor: pointer; border: 2px solid #fff; }
+        #reset-cal-btn { background: #ff4444; color: #fff; }
+        #reset-cal-btn:hover { background: #ff6666; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .player-color-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px; background: #0f1419; border: 1px solid #3d4975; border-radius: 4px; }
@@ -106,10 +119,43 @@
             <div class="settings-title">Settings</div>
             <div class="settings-tabs">
                 <button class="tab-btn active" data-tab="map-tab">Map Backgrounds</button>
+                <button class="tab-btn" data-tab="calibration-tab">Calibration</button>
                 <button class="tab-btn" data-tab="colors-tab">Player Colors</button>
             </div>
             <div id="map-tab" class="tab-content active">
                 <div id="map-inputs-container"></div>
+            </div>
+            <div id="calibration-tab" class="tab-content">
+                <div id="calibration-inputs-container">
+                    <div class="calibration-group">
+                        <label>Current Map: <span id="current-cal-map-name">-</span></label>
+                        <div class="calibration-description">
+                            Adjust these values to align player dots with the map. The values are applied immediately.
+                        </div>
+                        <div id="calibration-map-preview" style="width: 200px; height: 200px; background: #0f1419; border: 2px solid #3d4975; margin-top: 10px; display: flex; align-items: center; justify-content: center;">
+                            <span style="color: #666; font-size: 12px;">Map Preview</span>
+                        </div>
+                    </div>
+                    <div class="calibration-group">
+                        <label for="resolution-slider">Resolution (Scale Factor): <span id="resolution-value">4.40</span></label>
+                        <input type="range" id="resolution-slider" min="1" max="20" step="0.01" value="4.40">
+                        <div class="calibration-hint">Controls how much the map is zoomed/zoomed out</div>
+                    </div>
+                    <div class="calibration-group">
+                        <label for="offset-x-slider">Offset X: <span id="offset-x-value">0</span></label>
+                        <input type="range" id="offset-x-slider" min="-10000" max="10000" step="1" value="0">
+                        <div class="calibration-hint">Shifts positions left/right (negative = left, positive = right)</div>
+                    </div>
+                    <div class="calibration-group">
+                        <label for="offset-y-slider">Offset Y: <span id="offset-y-value">0</span></label>
+                        <input type="range" id="offset-y-slider" min="-10000" max="10000" step="1" value="0">
+                        <div class="calibration-hint">Shifts positions up/down (negative = up, positive = down)</div>
+                    </div>
+                    <div class="button-group" style="margin-top: 20px;">
+                        <button class="cancel-btn" id="reset-cal-btn">Reset to Saved</button>
+                        <button class="save-btn" id="save-cal-btn">Save Calibration</button>
+                    </div>
+                </div>
             </div>
             <div id="colors-tab" class="tab-content">
                 <div id="player-colors-container"></div>
@@ -245,35 +291,52 @@
             }
             
             currentMapName = normalizedName;
-            
+
             // Apply pre-calibrated map config if available
             if (MAP_CONFIGS[normalizedName]) {
                 const config = MAP_CONFIGS[normalizedName];
                 MAP_SCALE = config.resolution;
                 MAP_OFFSET_X = config.offset.x;
                 MAP_OFFSET_Y = config.offset.y;
-                
+
                 console.log(`✓ Applied config for ${normalizedName}: scale=${MAP_SCALE}, offset=(${MAP_OFFSET_X}, ${MAP_OFFSET_Y})`);
             }
+
+            // Apply saved calibration if available
+            if (MAP_BACKGROUNDS[`calibration_${normalizedName}`]) {
+                try {
+                    const calibration = JSON.parse(MAP_BACKGROUNDS[`calibration_${normalizedName}`]);
+                    MAP_SCALE = calibration.resolution;
+                    MAP_OFFSET_X = calibration.offset.x;
+                    MAP_OFFSET_Y = calibration.offset.y;
+
+                    console.log(`✓ Applied saved calibration for ${normalizedName}: scale=${MAP_SCALE}, offset=(${MAP_OFFSET_X}, ${MAP_OFFSET_Y})`);
+                } catch (e) {
+                    console.warn(`⚠ Failed to parse calibration for ${normalizedName}:`, e);
+                }
+            }
             
-            const bgUrl = MAP_BACKGROUNDS[normalizedName];
+             const bgUrl = MAP_BACKGROUNDS[normalizedName];
             document.getElementById('map-name').textContent = normalizedName;
             if (bgUrl && bgUrl.length > 10 && bgUrl !== 'URL_HERE') {
                 const img = new Image();
                 // Try without crossOrigin first (for same-origin images)
                 img.src = bgUrl;
-                img.onload = function() { 
+                img.onload = function() {
                     currentBgImage = img;
                     console.log('✓ Loaded background for ' + normalizedName);
                 };
-                img.onerror = function() { 
+                img.onerror = function() {
                     currentBgImage = null;
                     console.warn('⚠ Failed to load background image for ' + normalizedName + ' (CORS or 404)');
                     console.warn('  Using solid color background instead.');
                 };
-            } else { 
-                currentBgImage = null; 
+            } else {
+                currentBgImage = null;
             }
+
+            // Refresh calibration preview
+            refreshCalibrationPreview();
         }
 
         function worldToRadar(worldX, worldY) {
@@ -342,6 +405,30 @@
             ctx.beginPath();
             ctx.arc(x, y, 8, 0, Math.PI * 2);
             ctx.stroke();
+            
+            // Draw health text next to player dot (readable regardless of rotation)
+            if (health !== undefined && health > 0) {
+                // Save context before rotating text
+                ctx.save();
+                
+                // Undo the map rotation for the text so it's always readable
+                ctx.translate(x, y);
+                ctx.rotate(mapRotation * Math.PI / 180);
+                ctx.translate(-x, -y);
+                
+                // Draw health text
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = '#000';
+                ctx.shadowBlur = 3;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+                ctx.fillText(health, x, y - 16);
+                
+                ctx.restore();
+            }
         }
 
         // Interpolate between two positions for smoother movement
@@ -528,21 +615,21 @@
             for (const [mapName, url] of Object.entries(MAP_BACKGROUNDS)) {
                 const group = document.createElement('div');
                 group.className = 'settings-group';
-                
+
                 const label = document.createElement('label');
                 label.textContent = mapName;
-                
+
                 const inputContainer = document.createElement('div');
                 inputContainer.style.display = 'flex';
                 inputContainer.style.gap = '5px';
-                
+
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.value = url;
                 input.dataset.mapName = mapName;
                 input.placeholder = 'Enter image URL (1024x1024 PNG/JPG)';
                 input.style.flex = '1';
-                
+
                 const downloadBtn = document.createElement('button');
                 downloadBtn.textContent = '⬇ Download';
                 downloadBtn.className = 'save-btn';
@@ -555,19 +642,19 @@
                         alert('Please enter a valid image URL first');
                         return;
                     }
-                    
+
                     downloadBtn.disabled = true;
                     downloadBtn.textContent = '⏳ Downloading...';
-                    
+
                     try {
                         const response = await fetch('/api/download-map-image', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ mapName: mapName, imageUrl: imageUrl })
                         });
-                        
+
                         const result = await response.json();
-                        
+
                         if (response.ok) {
                             input.value = result.localPath;
                             downloadBtn.textContent = '✓ Downloaded';
@@ -586,18 +673,24 @@
                         downloadBtn.disabled = false;
                     }
                 };
-                
+
                 inputContainer.appendChild(input);
                 inputContainer.appendChild(downloadBtn);
                 group.appendChild(label);
                 group.appendChild(inputContainer);
                 mapInputsContainer.appendChild(group);
             }
-            
+
             // Populate player colors tab
             populatePlayerColorsUI();
-            
+
             modal.classList.add('active');
+
+            // Set default tab to map backgrounds
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector('.tab-btn[data-tab="map-tab"]').classList.add('active');
+            document.getElementById('map-tab').classList.add('active');
         });
 
         cancelBtn.addEventListener('click', () => {
@@ -641,6 +734,237 @@
                 modal.classList.remove('active');
             }
         });
+
+        // Tab switching functionality
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active class from all tabs and contents
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                // Add active class to clicked tab and corresponding content
+                btn.classList.add('active');
+                const tabId = btn.dataset.tab;
+                document.getElementById(tabId).classList.add('active');
+
+                // Populate calibration tab if it's the active tab
+                if (tabId === 'calibration-tab') {
+                    populateCalibrationTab();
+                }
+            });
+        });
+
+        // Calibration tab functions
+        let currentCalMapName = '';
+
+        function refreshCalibrationPreview() {
+            const calibrationTab = document.getElementById('calibration-tab');
+            if (calibrationTab.classList.contains('active')) {
+                const previewElement = document.getElementById('calibration-map-preview');
+                if (previewElement) {
+                    if (currentMapName && MAP_BACKGROUNDS[currentMapName] && MAP_BACKGROUNDS[currentMapName].length > 10) {
+                        previewElement.innerHTML = '';
+                        const previewImg = document.createElement('img');
+                        previewImg.src = MAP_BACKGROUNDS[currentMapName];
+                        previewImg.style.width = '100%';
+                        previewImg.style.height = '100%';
+                        previewImg.style.objectFit = 'contain';
+                        previewImg.onerror = function() {
+                            previewElement.innerHTML = '<span style="color: #666; font-size: 12px;">Failed to load map image</span>';
+                        };
+                        previewElement.appendChild(previewImg);
+                    } else {
+                        previewElement.innerHTML = '<span style="color: #666; font-size: 12px;">No map image loaded</span>';
+                    }
+                }
+            }
+        }
+
+        function populateCalibrationTab() {
+            const container = document.getElementById('calibration-inputs-container');
+            container.innerHTML = '';
+
+            // Show current map name
+            const mapNameGroup = document.createElement('div');
+            mapNameGroup.className = 'calibration-group';
+            mapNameGroup.innerHTML = `
+                <label>Current Map: <span id="current-cal-map-name">${currentMapName || 'Unknown'}</span></label>
+                <div class="calibration-description">
+                    Adjust these values to align player dots with the map. The values are applied immediately.
+                </div>
+            `;
+            container.appendChild(mapNameGroup);
+
+            // Add map preview
+            const previewGroup = document.createElement('div');
+            previewGroup.className = 'calibration-group';
+            previewGroup.innerHTML = `
+                <label>Map Preview</label>
+                <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
+                    <div id="calibration-map-preview" style="flex: 0 0 200px; height: 200px; background: #0f1419; border: 2px solid #3d4975; display: flex; align-items: center; justify-content: center;">
+                        <span style="color: #666; font-size: 12px;">Loading map...</span>
+                    </div>
+                    <button id="refresh-preview-btn" style="flex: 1; padding: 8px 12px; background: #4a9eff; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Refresh Preview</button>
+                </div>
+            `;
+            container.appendChild(previewGroup);
+
+            // Add event listener for refresh button
+            document.getElementById('refresh-preview-btn').addEventListener('click', () => {
+                const previewElement = document.getElementById('calibration-map-preview');
+                if (previewElement) {
+                    if (currentMapName && MAP_BACKGROUNDS[currentMapName] && MAP_BACKGROUNDS[currentMapName].length > 10) {
+                        previewElement.innerHTML = '<span style="color: #666; font-size: 12px;">Loading...</span>';
+                        const previewImg = document.createElement('img');
+                        previewImg.src = MAP_BACKGROUNDS[currentMapName];
+                        previewImg.style.width = '100%';
+                        previewImg.style.height = '100%';
+                        previewImg.style.objectFit = 'contain';
+                        previewImg.onload = function() {
+                            previewElement.innerHTML = '';
+                            previewElement.appendChild(previewImg);
+                        };
+                        previewImg.onerror = function() {
+                            previewElement.innerHTML = '<span style="color: #666; font-size: 12px;">Failed to load map image</span>';
+                        };
+                        previewElement.appendChild(previewImg);
+                    } else {
+                        previewElement.innerHTML = '<span style="color: #666; font-size: 12px;">No map image loaded</span>';
+                    }
+                }
+            });
+
+            // Add resolution slider
+            const resolutionGroup = document.createElement('div');
+            resolutionGroup.className = 'calibration-group';
+            resolutionGroup.innerHTML = `
+                <label for="resolution-slider">Resolution (Scale Factor): <span id="resolution-value">${MAP_SCALE.toFixed(2)}</span></label>
+                <input type="range" id="resolution-slider" min="1" max="20" step="0.01" value="${MAP_SCALE.toFixed(2)}">
+                <div class="calibration-hint">Controls how much the map is zoomed/zoomed out</div>
+            `;
+            container.appendChild(resolutionGroup);
+
+            // Add offset X slider
+            const offsetXGroup = document.createElement('div');
+            offsetXGroup.className = 'calibration-group';
+            offsetXGroup.innerHTML = `
+                <label for="offset-x-slider">Offset X: <span id="offset-x-value">${Math.round(MAP_OFFSET_X)}</span></label>
+                <input type="range" id="offset-x-slider" min="-10000" max="10000" step="1" value="${Math.round(MAP_OFFSET_X)}">
+                <div class="calibration-hint">Shifts positions left/right (negative = left, positive = right)</div>
+            `;
+            container.appendChild(offsetXGroup);
+
+            // Add offset Y slider
+            const offsetYGroup = document.createElement('div');
+            offsetYGroup.className = 'calibration-group';
+            offsetYGroup.innerHTML = `
+                <label for="offset-y-slider">Offset Y: <span id="offset-y-value">${Math.round(MAP_OFFSET_Y)}</span></label>
+                <input type="range" id="offset-y-slider" min="-10000" max="10000" step="1" value="${Math.round(MAP_OFFSET_Y)}">
+                <div class="calibration-hint">Shifts positions up/down (negative = up, positive = down)</div>
+            `;
+            container.appendChild(offsetYGroup);
+
+            // Add save and reset buttons
+            const buttonGroup = document.createElement('div');
+            buttonGroup.className = 'button-group';
+            buttonGroup.style.marginTop = '20px';
+            buttonGroup.innerHTML = `
+                <button class="cancel-btn" id="reset-cal-btn">Reset to Saved</button>
+                <button class="save-btn" id="save-cal-btn">Save Calibration</button>
+            `;
+            container.appendChild(buttonGroup);
+
+            // Add event listeners for sliders
+            const resolutionSlider = document.getElementById('resolution-slider');
+            const offsetXSlider = document.getElementById('offset-x-slider');
+            const offsetYSlider = document.getElementById('offset-y-slider');
+
+            resolutionSlider.addEventListener('input', (e) => {
+                MAP_SCALE = parseFloat(e.target.value);
+                document.getElementById('resolution-value').textContent = MAP_SCALE.toFixed(2);
+            });
+
+            offsetXSlider.addEventListener('input', (e) => {
+                MAP_OFFSET_X = parseFloat(e.target.value);
+                document.getElementById('offset-x-value').textContent = Math.round(MAP_OFFSET_X);
+            });
+
+            offsetYSlider.addEventListener('input', (e) => {
+                MAP_OFFSET_Y = parseFloat(e.target.value);
+                document.getElementById('offset-y-value').textContent = Math.round(MAP_OFFSET_Y);
+            });
+
+            // Load map preview
+            const previewElement = document.getElementById('calibration-map-preview');
+            if (currentMapName && MAP_BACKGROUNDS[currentMapName] && MAP_BACKGROUNDS[currentMapName].length > 10) {
+                const previewImg = document.createElement('img');
+                previewImg.src = MAP_BACKGROUNDS[currentMapName];
+                previewImg.style.width = '100%';
+                previewImg.style.height = '100%';
+                previewImg.style.objectFit = 'contain';
+                previewImg.onerror = function() {
+                    previewElement.innerHTML = '<span style="color: #666; font-size: 12px;">Failed to load map image</span>';
+                };
+                previewElement.appendChild(previewImg);
+            } else {
+                previewElement.innerHTML = '<span style="color: #666; font-size: 12px;">No map image loaded</span>';
+            }
+
+            // Reset button
+            document.getElementById('reset-cal-btn').addEventListener('click', () => {
+                if (currentMapName && MAP_CONFIGS[currentMapName]) {
+                    const config = MAP_CONFIGS[currentMapName];
+                    MAP_SCALE = config.resolution;
+                    MAP_OFFSET_X = config.offset.x;
+                    MAP_OFFSET_Y = config.offset.y;
+
+                    resolutionSlider.value = MAP_SCALE.toFixed(2);
+                    offsetXSlider.value = Math.round(MAP_OFFSET_X);
+                    offsetYSlider.value = Math.round(MAP_OFFSET_Y);
+
+                    document.getElementById('resolution-value').textContent = MAP_SCALE.toFixed(2);
+                    document.getElementById('offset-x-value').textContent = Math.round(MAP_OFFSET_X);
+                    document.getElementById('offset-y-value').textContent = Math.round(MAP_OFFSET_Y);
+
+                    console.log(`✓ Reset to saved config for ${currentMapName}: scale=${MAP_SCALE}, offset=(${MAP_OFFSET_X}, ${MAP_OFFSET_Y})`);
+                    alert('Calibration values reset to saved config');
+                } else {
+                    alert('No saved config found for this map. Make sure to save your calibration first.');
+                }
+            });
+
+            // Save button
+            document.getElementById('save-cal-btn').addEventListener('click', async () => {
+                if (!currentMapName) {
+                    alert('No map is currently loaded');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/map-backgrounds', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ...MAP_BACKGROUNDS,
+                            [`calibration_${currentMapName}`]: JSON.stringify({
+                                resolution: MAP_SCALE,
+                                offset: { x: MAP_OFFSET_X, y: MAP_OFFSET_Y }
+                            })
+                        })
+                    });
+
+                    if (response.ok) {
+                        console.log(`✓ Saved calibration for ${currentMapName}: scale=${MAP_SCALE}, offset=(${MAP_OFFSET_X}, ${MAP_OFFSET_Y})`);
+                        alert('Calibration saved successfully');
+                    } else {
+                        alert('Failed to save calibration');
+                    }
+                } catch (e) {
+                    console.error('Error saving calibration:', e);
+                    alert('Error saving calibration: ' + e.message);
+                }
+            });
+        }
 
         // Animation loop for smooth interpolation
         function animationLoop() {

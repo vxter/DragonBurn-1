@@ -137,6 +137,9 @@ namespace WebRadar
                 buffer << file.rdbuf();
                 res.set_header("Content-Type", "application/json");
                 res.set_header("Access-Control-Allow-Origin", "*");
+                res.set_header("Cache-Control", "no-cache, no-store, must-revalidate");
+                res.set_header("Pragma", "no-cache");
+                res.set_header("Expires", "0");
                 res.set_content(buffer.str(), "application/json");
             } else {
                 res.status = 404;
@@ -148,6 +151,9 @@ namespace WebRadar
         svr.Get("/api/map-backgrounds", [this](const httplib::Request&, httplib::Response& res) {
             res.set_header("Content-Type", "application/json");
             res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_header("Cache-Control", "no-cache, no-store, must-revalidate");
+            res.set_header("Pragma", "no-cache");
+            res.set_header("Expires", "0");
             std::string config = ReadMapBackgroundsConfig();
             res.set_content(config, "application/json");
         });
@@ -268,7 +274,9 @@ namespace WebRadar
                 ss << file.rdbuf();
                 res.set_header("Content-Type", "image/png");
                 res.set_header("Access-Control-Allow-Origin", "*");
-                res.set_header("Cache-Control", "public, max-age=86400");
+                res.set_header("Cache-Control", "no-cache, no-store, must-revalidate");
+                res.set_header("Pragma", "no-cache");
+                res.set_header("Expires", "0");
                 res.set_content(ss.str(), "image/png");
             } else {
                 res.status = 404;

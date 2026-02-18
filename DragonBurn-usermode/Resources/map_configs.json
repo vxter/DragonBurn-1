@@ -23,15 +23,15 @@
   "de_nuke": {
     "resolution": 6.98,
     "offset": {
-      "x": 3290,
-      "y": 5990
+      "x": 3457,
+      "y": 4289
     }
   },
-  "de_ancient": {
-    "resolution": 4.26,
+   "de_ancient": {
+    "resolution": 5.05,
     "offset": {
-      "x": 2590,
-      "y": 2520
+      "x": 2966,
+      "y": 2937
     }
   },
   "de_anubis": {
