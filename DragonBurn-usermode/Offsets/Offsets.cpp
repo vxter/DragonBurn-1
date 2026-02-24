@@ -210,9 +210,9 @@ void Offsets::UpdateOffsets()
     catch (...)
     {
         Log::Warning("Storage files not found, downloading from GitHub (a2x/cs2-dumper)");
-        offsets = Web::Get("https://raw.githubusercontent.com/a2x/cs2-dumper/main/output/offsets.json");
-        buttons = Web::Get("https://raw.githubusercontent.com/a2x/cs2-dumper/main/output/buttons.json");
-        client_dll = Web::Get("https://raw.githubusercontent.com/a2x/cs2-dumper/main/output/client_dll.json");
+        offsets = Web::Get("https://raw.githubusercontent.com/some-random-guy-ah/cs2-offsets/main/offsets.json");
+        buttons = Web::Get("https://raw.githubusercontent.com/some-random-guy-ah/cs2-offsets/main/buttons.json");
+        client_dll = Web::Get("https://raw.githubusercontent.com/some-random-guy-ah/cs2-offsets/main/client_dll.json");
 
         Log::Fine("Downloading successful, saving to storage");
         storage::WriteStorageFile("offsets.json", offsets);

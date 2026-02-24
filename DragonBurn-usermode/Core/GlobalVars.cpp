@@ -1,35 +1,100 @@
 #include "globalvars.h"
+#include "../Helpers/Logger.h"
+#include <sstream>
+
+namespace
+{
+	std::string ToHex(DWORD64 value)
+	{
+		std::ostringstream oss;
+		oss << "0x" << std::uppercase << std::hex << value;
+		return oss.str();
+	}
+}
 
 bool globalvars::UpdateGlobalvars()
 {
 	DWORD64 m_DglobalVars = 0;
-	if (!memoryManager.ReadMemory<DWORD64>(gGame.GetGlobalVarsAddress(), m_DglobalVars))
+	DWORD64 globalVarsPtr = gGame.GetGlobalVarsAddress();
+	if (!memoryManager.ReadMemory<DWORD64>(globalVarsPtr, m_DglobalVars))
+	{
+		Log::Warning("GlobalVars pointer read failed at " + ToHex(globalVarsPtr) +
+			" (client.dll " + ToHex(gGame.GetClientDLLAddress()) +
+			" + Offset.GlobalVars " + ToHex(Offset.GlobalVars) + ")");
 		return false;
+	}
+	if (m_DglobalVars == 0)
+	{
+		Log::Warning("GlobalVars pointer is null at " + ToHex(globalVarsPtr) +
+			" (client.dll " + ToHex(gGame.GetClientDLLAddress()) +
+			" + Offset.GlobalVars " + ToHex(Offset.GlobalVars) + "), skipping GlobalVars initialization");
+		return false;
+	}
 
 	this->address = m_DglobalVars;
 
+	auto logFieldFail = [this](const char* field, DWORD offset)
+	{
+		Log::Warning(std::string("GlobalVars ") + field + " read failed at " +
+			ToHex(this->address + offset) + " (base " + ToHex(this->address) +
+			" + offset " + ToHex(offset) + ")");
+	};
+
 	if (!this->GetRealTime())
+	{
+		logFieldFail("RealTime", Offset.GlobalVar.RealTime);
 		return false;
+	}
 	if (!this->GetFrameCount())
+	{
+		logFieldFail("FrameCount", Offset.GlobalVar.FrameCount);
 		return false;
+	}
 	if (!this->GetMaxClients())
+	{
+		logFieldFail("MaxClients", Offset.GlobalVar.MaxClients);
 		return false;
+	}
 	if (!this->GetTickCount())
+	{
+		logFieldFail("TickCount", Offset.GlobalVar.TickCount);
 		return false;
+	}
 	if (!this->GetIntervalPerTick())
+	{
+		logFieldFail("IntervalPerTick", Offset.GlobalVar.IntervalPerTick);
 		return false;
+	}
 	if (!this->GetIntervalPerTick2())
+	{
+		logFieldFail("IntervalPerTick2", Offset.GlobalVar.IntervalPerTick2);
 		return false;
+	}
 	if (!this->GetcurrentTime())
+	{
+		logFieldFail("CurrentTime", Offset.GlobalVar.CurrentTime);
 		return false;
+	}
 	if (!this->GetcurrentTime2())
+	{
+		logFieldFail("CurrentTime2", Offset.GlobalVar.CurrentTime2);
 		return false;
+	}
 	if (!this->GetCurrentNetchan())
+	{
+		logFieldFail("CurrentNetchan", Offset.GlobalVar.CurrentNetchan);
 		return false;
+	}
 	if (!this->GetCurrentMap())
+	{
+		logFieldFail("CurrentMap", Offset.GlobalVar.CurrentMap);
 		return false;
+	}
 	if (!this->GetCurrentMapName())
+	{
+		logFieldFail("CurrentMapName", Offset.GlobalVar.CurrentMapName);
 		return false;
+	}
 
 	return true;
 }

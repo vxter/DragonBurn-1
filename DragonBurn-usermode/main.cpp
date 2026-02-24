@@ -19,6 +19,7 @@
 #include "Helpers/UIAccess.h"
 #include "Features/WebRadar.h"
 #include <filesystem>
+#include <sstream>
 #include <KnownFolders.h>
 #include <ShlObj.h>
 
@@ -27,6 +28,16 @@ using namespace std;
 namespace fs = filesystem;
 string fileName;
 bool secureMode, legacyImg, forceprefs;
+
+namespace
+{
+	std::string ToHex(DWORD64 value)
+	{
+		std::ostringstream oss;
+		oss << "0x" << std::uppercase << std::hex << value;
+		return oss.str();
+	}
+}
 
 void Cheat();
 bool CheckArg(const int&, char**, const std::string&);
@@ -224,6 +235,10 @@ UPDATE_OFFSETS://UPDATE_OFFSETS
 		Offset.UpdateOffsets();
 		Log::PreviousLine();
 		Log::Fine("Offsets updated");
+		Log::Info("Offsets snapshot:");
+		Log::Info("  client.dll base = " + ToHex(gGame.GetClientDLLAddress()));
+		Log::Info("  Offset.GlobalVars = " + ToHex(Offset.GlobalVars));
+		Log::Info("  Offset.GlobalVar.RealTime = " + ToHex(Offset.GlobalVar.RealTime));
 	}
 	catch (const std::exception& error)
 	{
@@ -255,14 +270,38 @@ UPDATE_OFFSETS://UPDATE_OFFSETS
 	if (!inited)
 	{
 		Log::PreviousLine();
+		Log::Warning("Init addresses failed. client.dll=" + ToHex(gGame.GetClientDLLAddress()) +
+			", server.dll=" + ToHex(gGame.GetServerDLLAddress()) +
+			", entityList=" + ToHex(gGame.GetEntityListAddress()) +
+			", globalVars=" + ToHex(gGame.GetGlobalVarsAddress()));
 		Log::Error("Failed to Init Addresses");
+	}
+	else
+	{
+		Log::Info("Addresses snapshot:");
+		Log::Info("  client.dll base = " + ToHex(gGame.GetClientDLLAddress()));
+		Log::Info("  server.dll base = " + ToHex(gGame.GetServerDLLAddress()));
+		Log::Info("  globalVars addr = " + ToHex(gGame.GetGlobalVarsAddress()));
 	}
 
 	g_globalVars = std::make_unique<globalvars>();
-	if (!g_globalVars->UpdateGlobalvars())
+	Log::Info("Initializing GlobalVars...", '.');
+	int gvTryCount = 0;
+	bool gvInited = false;
+	do
+	{
+		std::cout << '.';
+		gvTryCount++;
+		gvInited = g_globalVars->UpdateGlobalvars();
+		if (!gvInited)
+			Sleep(1000);
+	} while (!gvInited && gvTryCount < 60);
+	std::cout << '\n';
+
+	if (!gvInited)
 	{
 		Log::PreviousLine();
-		Log::Error("Offsets are outdated, wait a few hours for offsets to update");
+		Log::Error("Failed to initialize GlobalVars after retries - offset may be incorrect");
 	}
 
 	Log::PreviousLine();
