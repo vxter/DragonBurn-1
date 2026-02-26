@@ -132,49 +132,56 @@ void Cheats::Run()
 		// Update web radar
 		if (WebRadarCFG::Enabled && WebRadar::g_webRadar && WebRadar::g_webRadar->IsEnabled())
 		{
-			// Collect bomb data if planted
+			// Collect bomb data - check if planted or held by a player
 			WebRadar::BombData bombData{};
-			uintptr_t plantedC4 = 0;
+			bool bombFound = false;
 			
-			// Read planted C4 address
+			// First check if bomb is planted
+			uintptr_t plantedC4 = 0;
 			if (memoryManager.ReadMemory<uintptr_t>(gGame.GetClientDLLAddress() + Offset.PlantedC4, plantedC4) && plantedC4)
 			{
-				Log::Fine("PlantedC4 offset found: " + std::to_string(plantedC4));
-				
 				// Dereference to get actual C4 entity pointer
 				uintptr_t c4Entity = 0;
 				if (memoryManager.ReadMemory<uintptr_t>(plantedC4, c4Entity) && c4Entity)
 				{
-					Log::Fine("C4 entity found: " + std::to_string(c4Entity));
-					
 					// Read bomb position directly from entity + Pawn.Pos offset
 					Vec3 bombPos{};
 					if (memoryManager.ReadMemory<Vec3>(c4Entity + Offset.Pawn.Pos, bombPos))
 					{
-						Log::Fine("Bomb position read: X=" + std::to_string(bombPos.x) + " Y=" + std::to_string(bombPos.y) + " Z=" + std::to_string(bombPos.z));
 						bombData.position = bombPos;
 						bombData.isPlanted = true;
 						
 						// Read bomb site
 						memoryManager.ReadMemory<int>(c4Entity + Offset.C4.m_nBombSite, bombData.bombSite);
-						Log::Fine("Bomb site: " + std::to_string(bombData.bombSite));
 						
 						// Read defuse status
 						memoryManager.ReadMemory<bool>(c4Entity + Offset.C4.m_bBeingDefused, bombData.isBeingDefused);
-					}
-					else
-					{
-						Log::Warning("Failed to read bomb position");
+						
+						bombFound = true;
 					}
 				}
-				else
+			}
+			
+			// If bomb not planted, check if any player is holding it
+			if (!bombFound)
+			{
+				// Check all players for bomb (weapon ID 49 is C4)
+				for (const auto& [entityIndex, entity] : cachedResults)
 				{
-					Log::Warning("Failed to dereference C4 entity");
+					if (entity.IsAlive() && entity.Pawn.WeaponName == "c4")
+					{
+						bombData.position = entity.Pawn.Pos;
+						bombData.isPlanted = false;
+						bombData.bombSite = 0;  // Not applicable when held
+						bombData.isBeingDefused = false;
+						bombFound = true;
+						break;
+					}
 				}
 			}
 			
 			WebRadar::g_webRadar->UpdateRadarData(cachedResults, LocalEntity, LocalPlayerControllerIndex, m_currentTick, 
-				bombData.isPlanted ? &bombData : nullptr);
+				bombFound ? &bombData : nullptr);
 		}
 		
 		m_previousTick = m_currentTick;
