@@ -141,6 +141,15 @@ void Cheats::Run()
 			bool isBombPlanted = false;
 			memoryManager.ReadMemory<bool>(plantedAddress - 0x8, isBombPlanted);
 			
+			static bool bombDebugLogged = false;
+			if (!bombDebugLogged)
+			{
+				Log::Info("WebRadar bomb debug: isBombPlanted=" + std::to_string(isBombPlanted) + 
+					" entityCount=" + std::to_string(cachedResults.size()) +
+					" localAlive=" + std::to_string(LocalEntity.IsAlive()));
+				bombDebugLogged = true;
+			}
+			
 			if (isBombPlanted)
 			{
 				uintptr_t plantedC4 = 0;
@@ -170,12 +179,12 @@ void Cheats::Run()
 			// If bomb not planted, check if any player has it in their inventory
 			if (!bombFound)
 			{
-				for (const auto& [entityIndex, entity] : cachedResults)
+				// Helper lambda to check a single entity for C4
+				auto checkEntityForBomb = [&](const CEntity& entity) -> bool
 				{
-					if (!entity.IsAlive())
-						continue;
+					if (!entity.IsAlive() || entity.Pawn.Address == 0)
+						return false;
 					
-					// Check weapon inventory for C4 (weapon ID 49)
 					auto inventory = entity.Pawn.GetWeaponInventory(gGame.GetEntityListAddress());
 					for (short weaponID : inventory)
 					{
@@ -186,10 +195,21 @@ void Cheats::Run()
 							bombData.bombSite = -1;
 							bombData.isBeingDefused = false;
 							bombFound = true;
-							break;
+							return true;
 						}
 					}
-					if (bombFound) break;
+					return false;
+				};
+				
+				// Check local player first
+				if (!checkEntityForBomb(LocalEntity))
+				{
+					// Check all other players
+					for (const auto& [entityIndex, entity] : cachedResults)
+					{
+						if (checkEntityForBomb(entity))
+							break;
+					}
 				}
 			}
 			
