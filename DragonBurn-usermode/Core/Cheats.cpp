@@ -170,7 +170,7 @@ void Cheats::Run()
 			// If bomb not planted, check if any player has it
 			if (!bombFound)
 			{
-				// Helper lambda to check a single entity for C4
+				// Check if any player is carrying the bomb
 				auto checkEntityForBomb = [&](const CEntity& entity) -> bool
 				{
 					if (!entity.IsAlive() || entity.Pawn.Address == 0)
@@ -212,6 +212,62 @@ void Cheats::Run()
 					{
 						if (checkEntityForBomb(entity))
 							break;
+					}
+				}
+			}
+			
+			// If bomb not planted and no player has it, scan entity list for dropped C4
+			if (!bombFound)
+			{
+				// The weapon definition index offset chain (flat sum, no pointer deref needed)
+				DWORD weaponDefIndexOffset = Offset.EconEntity.AttributeManager + 
+					Offset.WeaponBaseData.Item + Offset.WeaponBaseData.ItemDefinitionIndex;
+				
+				// Scan entity list beyond player slots (64+) for weapon entities
+				// Entity list is a two-level table: base -> chunk -> entity
+				DWORD64 entityListBase = 0;
+				if (memoryManager.ReadMemory<DWORD64>(gGame.GetEntityListAddress(), entityListBase) && entityListBase)
+				{
+					// Scan chunks 0-1 (entities 0-1023), which covers most weapon entities
+					for (int chunkIdx = 0; chunkIdx < 2 && !bombFound; chunkIdx++)
+					{
+						DWORD64 chunkPtr = 0;
+						if (!memoryManager.ReadMemory<DWORD64>(entityListBase + 0x10 + chunkIdx * 8, chunkPtr) || !chunkPtr)
+							continue;
+						
+						// Start from slot 65 in chunk 0 (skip player controllers), scan all of chunk 1
+						int startSlot = (chunkIdx == 0) ? 65 : 0;
+						int endSlot = 512;
+						
+						for (int slot = startSlot; slot < endSlot && !bombFound; slot++)
+						{
+							DWORD64 entityPtr = 0;
+							if (!memoryManager.ReadMemory<DWORD64>(chunkPtr + slot * 0x70, entityPtr) || !entityPtr)
+								continue;
+							
+							// Check if this entity is a C4 weapon (definition index 49)
+							short weaponID = 0;
+							if (!memoryManager.ReadMemory<short>(entityPtr + weaponDefIndexOffset, weaponID))
+								continue;
+							
+							if (weaponID == 49)
+							{
+								// Found dropped C4! Read its position via GameSceneNode -> m_vecAbsOrigin
+								DWORD64 gameSceneNode = 0;
+								if (memoryManager.ReadMemory<DWORD64>(entityPtr + Offset.Pawn.GameSceneNode, gameSceneNode) && gameSceneNode)
+								{
+									Vec3 bombPos{};
+									if (memoryManager.ReadMemory<Vec3>(gameSceneNode + 0xD0, bombPos))
+									{
+										bombData.position = bombPos;
+										bombData.isPlanted = false;
+										bombData.bombSite = -1;
+										bombData.isBeingDefused = false;
+										bombFound = true;
+									}
+								}
+							}
+						}
 					}
 				}
 			}
