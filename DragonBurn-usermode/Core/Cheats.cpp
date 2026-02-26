@@ -136,30 +136,29 @@ void Cheats::Run()
 			WebRadar::BombData bombData{};
 			bool bombFound = false;
 			
-			// First check if bomb is planted
-			uintptr_t plantedC4 = 0;
-			if (memoryManager.ReadMemory<uintptr_t>(gGame.GetClientDLLAddress() + Offset.PlantedC4, plantedC4) && plantedC4)
+			// Check if bomb is actually planted using the flag at PlantedC4 - 0x8
+			auto plantedAddress = gGame.GetClientDLLAddress() + Offset.PlantedC4;
+			bool isBombPlanted = false;
+			memoryManager.ReadMemory<bool>(plantedAddress - 0x8, isBombPlanted);
+			
+			if (isBombPlanted)
 			{
-				// Dereference to get actual C4 entity pointer
-				uintptr_t c4Entity = 0;
-				if (memoryManager.ReadMemory<uintptr_t>(plantedC4, c4Entity) && c4Entity)
+				uintptr_t plantedC4 = 0;
+				if (memoryManager.ReadMemory<uintptr_t>(plantedAddress, plantedC4) && plantedC4)
 				{
-					// Read bomb site to confirm we have a valid C4 entity
-					int bombSite = 0;
-					if (memoryManager.ReadMemory<int>(c4Entity + Offset.C4.m_nBombSite, bombSite) && (bombSite == 0 || bombSite == 1))
+					uintptr_t c4Entity = 0;
+					if (memoryManager.ReadMemory<uintptr_t>(plantedC4, c4Entity) && c4Entity)
 					{
-						// C4 is not a PlayerPawn, so Pawn.Pos won't work.
 						// Read position via: C4 entity -> m_pGameSceneNode -> m_vecAbsOrigin
 						DWORD64 gameSceneNode = 0;
 						if (memoryManager.ReadMemory<DWORD64>(c4Entity + Offset.Pawn.GameSceneNode, gameSceneNode) && gameSceneNode)
 						{
 							Vec3 bombPos{};
-							// m_vecAbsOrigin is at offset 0xD0 (208) in CGameSceneNode
 							if (memoryManager.ReadMemory<Vec3>(gameSceneNode + 0xD0, bombPos))
 							{
 								bombData.position = bombPos;
 								bombData.isPlanted = true;
-								bombData.bombSite = bombSite;
+								memoryManager.ReadMemory<int>(c4Entity + Offset.C4.m_nBombSite, bombData.bombSite);
 								memoryManager.ReadMemory<bool>(c4Entity + Offset.C4.m_bBeingDefused, bombData.isBeingDefused);
 								bombFound = true;
 							}
