@@ -144,11 +144,11 @@ void Cheats::Run()
 				uintptr_t c4Entity = 0;
 				if (memoryManager.ReadMemory<uintptr_t>(plantedC4, c4Entity) && c4Entity)
 				{
-					// Read bomb position directly from entity + Pawn.Pos offset
-					Vec3 bombPos{};
-					if (memoryManager.ReadMemory<Vec3>(c4Entity + Offset.Pawn.Pos, bombPos))
+					// Try to read C4 as a full entity to get proper position
+					CEntity bombEntity;
+					if (bombEntity.UpdatePawn(c4Entity))
 					{
-						bombData.position = bombPos;
+						bombData.position = bombEntity.Pawn.Pos;
 						bombData.isPlanted = true;
 						
 						// Read bomb site
@@ -158,6 +158,27 @@ void Cheats::Run()
 						memoryManager.ReadMemory<bool>(c4Entity + Offset.C4.m_bBeingDefused, bombData.isBeingDefused);
 						
 						bombFound = true;
+					}
+					
+					// If UpdatePawn failed, try searching entity list for C4 entity
+					if (!bombFound)
+					{
+						// Search all cached entities for the C4 entity (might be listed separately)
+						for (const auto& [idx, entity] : cachedResults)
+						{
+							// Check if this entity is at the same address as the planted C4
+							if (entity.Pawn.Address == c4Entity || entity.Controller.Address == c4Entity)
+							{
+								bombData.position = entity.Pawn.Pos;
+								bombData.isPlanted = true;
+								
+								memoryManager.ReadMemory<int>(c4Entity + Offset.C4.m_nBombSite, bombData.bombSite);
+								memoryManager.ReadMemory<bool>(c4Entity + Offset.C4.m_bBeingDefused, bombData.isBeingDefused);
+								
+								bombFound = true;
+								break;
+							}
+						}
 					}
 				}
 			}
