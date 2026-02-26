@@ -224,7 +224,7 @@ namespace WebRadar
 
         // Bomb data
         json << "\"bomb\":";
-        if (bombData && bombData->isPlanted)
+        if (bombData)
         {
             json << "{";
             json << "\"position\":{";
@@ -232,7 +232,7 @@ namespace WebRadar
             json << "\"y\":" << bombData->position.y << ",";
             json << "\"z\":" << bombData->position.z;
             json << "},";
-            json << "\"isPlanted\":true,";
+            json << "\"isPlanted\":" << (bombData->isPlanted ? "true" : "false") << ",";
             json << "\"bombSite\":" << bombData->bombSite << ",";
             json << "\"isBeingDefused\":" << (bombData->isBeingDefused ? "true" : "false");
             json << "}";

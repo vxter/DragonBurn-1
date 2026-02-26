@@ -214,37 +214,6 @@ void Cheats::Run()
 							break;
 					}
 				}
-				
-				// Debug: log once per second
-				static DWORD lastBombDebugTick = 0;
-				if (m_currentTick - lastBombDebugTick > 64)
-				{
-					lastBombDebugTick = m_currentTick;
-					int aliveCount = 0;
-					std::string weapons = "";
-					
-					if (LocalEntity.IsAlive())
-					{
-						aliveCount++;
-						weapons += "LOCAL:" + std::string(LocalEntity.Pawn.WeaponName) + " ";
-						auto inv = LocalEntity.Pawn.GetWeaponInventory(gGame.GetEntityListAddress());
-						weapons += "(inv:" + std::to_string(inv.size()) + ") ";
-					}
-					
-					for (const auto& [idx, e] : cachedResults)
-					{
-						if (e.IsAlive())
-						{
-							aliveCount++;
-							weapons += std::string(e.Controller.PlayerName) + ":" + std::string(e.Pawn.WeaponName) + " ";
-						}
-					}
-					
-					Log::Info("BombScan: planted=" + std::to_string(isBombPlanted) + 
-						" found=" + std::to_string(bombFound) +
-						" alive=" + std::to_string(aliveCount) + 
-						" weapons=[" + weapons + "]");
-				}
 			}
 			
 			WebRadar::g_webRadar->UpdateRadarData(cachedResults, LocalEntity, LocalPlayerControllerIndex, m_currentTick, 
