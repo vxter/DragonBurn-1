@@ -431,9 +431,9 @@
             }
         }
 
-        function drawBomb(x, y, bombSite, isBeingDefused) {
-            // Draw bomb as a large yellow/orange circle with pulsing effect
-            const bombColor = isBeingDefused ? '#00ff00' : '#ffaa00';
+        function drawBomb(x, y, bombSite, isBeingDefused, isPlanted) {
+            // Colors: green if defusing, orange if planted, yellow if carried
+            const bombColor = isBeingDefused ? '#00ff00' : (isPlanted ? '#ff6600' : '#ffcc00');
             
             // Draw outer glow
             ctx.shadowBlur = 25;
@@ -461,7 +461,7 @@
             ctx.arc(x, y, 10, 0, Math.PI * 2);
             ctx.stroke();
             
-            // Draw bomb site indicator
+            // Draw label: site letter if planted, "C4" if carried
             ctx.save();
             ctx.translate(x, y);
             ctx.rotate(mapRotation * Math.PI / 180);
@@ -475,7 +475,13 @@
             ctx.shadowBlur = 3;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
-            ctx.fillText(bombSite === 0 ? 'A' : 'B', x, y);
+            
+            if (isPlanted) {
+                ctx.fillText(bombSite === 0 ? 'A' : 'B', x, y);
+            } else {
+                ctx.font = 'bold 8px Arial';
+                ctx.fillText('C4', x, y);
+            }
             
             ctx.restore();
         }
@@ -542,12 +548,12 @@
                  if (player.teamId === data.localTeamId) allyCount++; else enemyCount++;
              });
              
-             // Draw bomb if planted
+             // Draw bomb (planted or carried)
              if (data.bomb && data.bomb.position) {
                  const bombPos = worldToRadar(data.bomb.position.x, data.bomb.position.y);
                  const isBombOnCanvas = bombPos.x >= 0 && bombPos.x <= 1024 && bombPos.y >= 0 && bombPos.y <= 1024;
                  if (isBombOnCanvas) {
-                     drawBomb(bombPos.x, bombPos.y, data.bomb.bombSite || 0, data.bomb.isBeingDefused || false);
+                     drawBomb(bombPos.x, bombPos.y, data.bomb.bombSite || 0, data.bomb.isBeingDefused || false, data.bomb.isPlanted || false);
                  }
              }
              

@@ -168,21 +168,29 @@ void Cheats::Run()
 				}
 			}
 			
-			// If bomb not planted, check if any player is holding it
+			// If bomb not planted, check if any player has it in their inventory
 			if (!bombFound)
 			{
-				// Check all players for bomb (weapon ID 49 is C4)
 				for (const auto& [entityIndex, entity] : cachedResults)
 				{
-					if (entity.IsAlive() && entity.Pawn.WeaponName == "c4")
+					if (!entity.IsAlive())
+						continue;
+					
+					// Check weapon inventory for C4 (weapon ID 49)
+					auto inventory = entity.Pawn.GetWeaponInventory(gGame.GetEntityListAddress());
+					for (short weaponID : inventory)
 					{
-						bombData.position = entity.Pawn.Pos;
-						bombData.isPlanted = false;
-						bombData.bombSite = 0;  // Not applicable when held
-						bombData.isBeingDefused = false;
-						bombFound = true;
-						break;
+						if (weaponID == 49)
+						{
+							bombData.position = entity.Pawn.Pos;
+							bombData.isPlanted = false;
+							bombData.bombSite = -1;
+							bombData.isBeingDefused = false;
+							bombFound = true;
+							break;
+						}
 					}
+					if (bombFound) break;
 				}
 			}
 			
