@@ -141,15 +141,6 @@ void Cheats::Run()
 			bool isBombPlanted = false;
 			memoryManager.ReadMemory<bool>(plantedAddress - 0x8, isBombPlanted);
 			
-			static bool bombDebugLogged = false;
-			if (!bombDebugLogged)
-			{
-				Log::Info("WebRadar bomb debug: isBombPlanted=" + std::to_string(isBombPlanted) + 
-					" entityCount=" + std::to_string(cachedResults.size()) +
-					" localAlive=" + std::to_string(LocalEntity.IsAlive()));
-				bombDebugLogged = true;
-			}
-			
 			if (isBombPlanted)
 			{
 				uintptr_t plantedC4 = 0;
@@ -176,7 +167,7 @@ void Cheats::Run()
 				}
 			}
 			
-			// If bomb not planted, check if any player has it in their inventory
+			// If bomb not planted, check if any player has it
 			if (!bombFound)
 			{
 				// Helper lambda to check a single entity for C4
@@ -185,6 +176,18 @@ void Cheats::Run()
 					if (!entity.IsAlive() || entity.Pawn.Address == 0)
 						return false;
 					
+					// Quick check: is the active weapon the bomb?
+					if (entity.Pawn.WeaponName == "c4")
+					{
+						bombData.position = entity.Pawn.Pos;
+						bombData.isPlanted = false;
+						bombData.bombSite = -1;
+						bombData.isBeingDefused = false;
+						bombFound = true;
+						return true;
+					}
+					
+					// Full check: scan weapon inventory for C4 (weapon ID 49)
 					auto inventory = entity.Pawn.GetWeaponInventory(gGame.GetEntityListAddress());
 					for (short weaponID : inventory)
 					{
@@ -210,6 +213,37 @@ void Cheats::Run()
 						if (checkEntityForBomb(entity))
 							break;
 					}
+				}
+				
+				// Debug: log once per second
+				static DWORD lastBombDebugTick = 0;
+				if (m_currentTick - lastBombDebugTick > 64)
+				{
+					lastBombDebugTick = m_currentTick;
+					int aliveCount = 0;
+					std::string weapons = "";
+					
+					if (LocalEntity.IsAlive())
+					{
+						aliveCount++;
+						weapons += "LOCAL:" + std::string(LocalEntity.Pawn.WeaponName) + " ";
+						auto inv = LocalEntity.Pawn.GetWeaponInventory(gGame.GetEntityListAddress());
+						weapons += "(inv:" + std::to_string(inv.size()) + ") ";
+					}
+					
+					for (const auto& [idx, e] : cachedResults)
+					{
+						if (e.IsAlive())
+						{
+							aliveCount++;
+							weapons += std::string(e.Controller.PlayerName) + ":" + std::string(e.Pawn.WeaponName) + " ";
+						}
+					}
+					
+					Log::Info("BombScan: planted=" + std::to_string(isBombPlanted) + 
+						" found=" + std::to_string(bombFound) +
+						" alive=" + std::to_string(aliveCount) + 
+						" weapons=[" + weapons + "]");
 				}
 			}
 			
