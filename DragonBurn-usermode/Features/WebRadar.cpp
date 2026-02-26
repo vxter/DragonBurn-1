@@ -82,7 +82,8 @@ namespace WebRadar
         const std::vector<std::pair<int, CEntity>>& entities,
         const CEntity& localEntity,
         int localPlayerControllerIndex,
-        DWORD tickCount)
+        DWORD tickCount,
+        const BombData* bombData)
     {
         if (!m_initialized || !m_server || !m_server->IsRunning())
             return;
@@ -136,7 +137,7 @@ namespace WebRadar
         mapData.offsetY = WebRadarCFG::OffsetY;
 
         // Build and send JSON
-        std::string json = BuildJSON(players, mapData, localEntity.Controller.TeamID, tickCount, localPlayerControllerIndex);
+        std::string json = BuildJSON(players, mapData, localEntity.Controller.TeamID, tickCount, localPlayerControllerIndex, bombData);
         m_server->UpdateRadarData(json);
     }
 
@@ -162,7 +163,8 @@ namespace WebRadar
         const MapData& mapData,
         int localTeamId,
         DWORD tickCount,
-        int localPlayerIndex)
+        int localPlayerIndex,
+        const BombData* bombData)
     {
         std::ostringstream json;
         json << std::fixed << std::setprecision(2);
@@ -218,7 +220,27 @@ namespace WebRadar
             if (i < players.size() - 1)
                 json << ",";
         }
-        json << "]";
+        json << "],";
+
+        // Bomb data
+        json << "\"bomb\":";
+        if (bombData && bombData->isPlanted)
+        {
+            json << "{";
+            json << "\"position\":{";
+            json << "\"x\":" << bombData->position.x << ",";
+            json << "\"y\":" << bombData->position.y << ",";
+            json << "\"z\":" << bombData->position.z;
+            json << "},";
+            json << "\"isPlanted\":true,";
+            json << "\"bombSite\":" << bombData->bombSite << ",";
+            json << "\"isBeingDefused\":" << (bombData->isBeingDefused ? "true" : "false");
+            json << "}";
+        }
+        else
+        {
+            json << "null";
+        }
 
         json << "}";
 

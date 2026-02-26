@@ -58,6 +58,9 @@ void Cheats::Run()
 	if (!memoryManager.ReadMemory(gGame.GetMatrixAddress(), gGame.View.Matrix,64))
 		return;
 
+	// Update GlobalVars every frame
+	g_globalVars->UpdateGlobalvars();
+
 	// Update EntityList Entry
 	gGame.UpdateEntityListEntry();
 
@@ -70,7 +73,6 @@ void Cheats::Run()
 		return;
 
 	if (LocalPawnAddress == 0 || LocalControllerAddress == 0) {
-        g_globalVars->UpdateGlobalvars();
         cachedResults.clear();
         return;
     }
@@ -130,7 +132,35 @@ void Cheats::Run()
 		// Update web radar
 		if (WebRadarCFG::Enabled && WebRadar::g_webRadar && WebRadar::g_webRadar->IsEnabled())
 		{
-			WebRadar::g_webRadar->UpdateRadarData(cachedResults, LocalEntity, LocalPlayerControllerIndex, m_currentTick);
+			// Collect bomb data if planted
+			WebRadar::BombData bombData{};
+			uintptr_t plantedC4 = 0;
+			
+			// Read planted C4 address
+			if (memoryManager.ReadMemory<uintptr_t>(gGame.GetClientDLLAddress() + Offset.PlantedC4, plantedC4) && plantedC4)
+			{
+				// Dereference to get actual C4 entity pointer
+				uintptr_t c4Entity = 0;
+				if (memoryManager.ReadMemory<uintptr_t>(plantedC4, c4Entity) && c4Entity)
+				{
+					// Read bomb entity position and data
+					Vec3 bombPos{};
+					if (memoryManager.ReadMemory<Vec3>(c4Entity + Offset.Pawn.Pos, bombPos))
+					{
+						bombData.position = bombPos;
+						bombData.isPlanted = true;
+						
+						// Read bomb site
+						memoryManager.ReadMemory<int>(c4Entity + Offset.C4.m_nBombSite, bombData.bombSite);
+						
+						// Read defuse status
+						memoryManager.ReadMemory<bool>(c4Entity + Offset.C4.m_bBeingDefused, bombData.isBeingDefused);
+					}
+				}
+			}
+			
+			WebRadar::g_webRadar->UpdateRadarData(cachedResults, LocalEntity, LocalPlayerControllerIndex, m_currentTick, 
+				bombData.isPlanted ? &bombData : nullptr);
 		}
 		
 		m_previousTick = m_currentTick;

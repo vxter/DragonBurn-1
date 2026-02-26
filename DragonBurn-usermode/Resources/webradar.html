@@ -431,15 +431,64 @@
             }
         }
 
-        // Interpolate between two positions for smoother movement
-        function interpolatePosition(oldPos, newPos, alpha) {
-            if (!oldPos) return newPos;
-            return {
-                x: oldPos.x + (newPos.x - oldPos.x) * alpha,
-                y: oldPos.y + (newPos.y - oldPos.y) * alpha,
-                z: oldPos.z + (newPos.z - oldPos.z) * alpha
-            };
+        function drawBomb(x, y, bombSite, isBeingDefused) {
+            // Draw bomb as a large yellow/orange circle with pulsing effect
+            const bombColor = isBeingDefused ? '#00ff00' : '#ffaa00';
+            
+            // Draw outer glow
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = bombColor;
+            ctx.fillStyle = bombColor;
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.arc(x, y, 15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            
+            // Draw main bomb circle
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = bombColor;
+            ctx.fillStyle = bombColor;
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw border
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Draw bomb site indicator
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(mapRotation * Math.PI / 180);
+            ctx.translate(-x, -y);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = '#000';
+            ctx.shadowBlur = 3;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            ctx.fillText(bombSite === 0 ? 'A' : 'B', x, y);
+            
+            ctx.restore();
         }
+
+        // Interpolate between two positions for smoother movement
+         function interpolatePosition(oldPos, newPos, alpha) {
+             if (!oldPos) return newPos;
+             return {
+                 x: oldPos.x + (newPos.x - oldPos.x) * alpha,
+                 y: oldPos.y + (newPos.y - oldPos.y) * alpha,
+                 z: oldPos.z + (newPos.z - oldPos.z) * alpha
+             };
+         }
 
         function render(data) {
             ctx.clearRect(0, 0, 1024, 1024);
@@ -470,30 +519,40 @@
             
             let allyCount = 0, enemyCount = 0;
             
-            data.players.forEach((player, idx) => {
-                // Track all players we've seen (field is "name" in JSON)
-                if (player.name) {
-                    seenPlayers.add(player.name);
-                }
-                
-                // Get interpolated position if we have previous data
-                let position = player.position;
-                if (interpolationEnabled && lastPlayerData && lastPlayerData.players) {
-                    const lastPlayer = lastPlayerData.players.find(p => p.entityIndex === player.entityIndex);
-                    if (lastPlayer) {
-                        position = interpolatePosition(lastPlayer.position, player.position, alpha);
-                    }
-                }
-                
-                const pos = worldToRadar(position.x, position.y);
-                const isOnCanvas = pos.x >= 0 && pos.x <= 1024 && pos.y >= 0 && pos.y <= 1024;
-                if (isOnCanvas) {
-                    drawPlayer(pos.x, pos.y, player.teamId === data.localTeamId, player.health, player.isLocalPlayer || false, player.viewAngle, player.name);
-                }
-                if (player.teamId === data.localTeamId) allyCount++; else enemyCount++;
-            });
-            // Restore canvas context after drawing everything
-            ctx.restore();
+             data.players.forEach((player, idx) => {
+                 // Track all players we've seen (field is "name" in JSON)
+                 if (player.name) {
+                     seenPlayers.add(player.name);
+                 }
+                 
+                 // Get interpolated position if we have previous data
+                 let position = player.position;
+                 if (interpolationEnabled && lastPlayerData && lastPlayerData.players) {
+                     const lastPlayer = lastPlayerData.players.find(p => p.entityIndex === player.entityIndex);
+                     if (lastPlayer) {
+                         position = interpolatePosition(lastPlayer.position, player.position, alpha);
+                     }
+                 }
+                 
+                 const pos = worldToRadar(position.x, position.y);
+                 const isOnCanvas = pos.x >= 0 && pos.x <= 1024 && pos.y >= 0 && pos.y <= 1024;
+                 if (isOnCanvas) {
+                     drawPlayer(pos.x, pos.y, player.teamId === data.localTeamId, player.health, player.isLocalPlayer || false, player.viewAngle, player.name);
+                 }
+                 if (player.teamId === data.localTeamId) allyCount++; else enemyCount++;
+             });
+             
+             // Draw bomb if planted
+             if (data.bomb && data.bomb.position) {
+                 const bombPos = worldToRadar(data.bomb.position.x, data.bomb.position.y);
+                 const isBombOnCanvas = bombPos.x >= 0 && bombPos.x <= 1024 && bombPos.y >= 0 && bombPos.y <= 1024;
+                 if (isBombOnCanvas) {
+                     drawBomb(bombPos.x, bombPos.y, data.bomb.bombSite || 0, data.bomb.isBeingDefused || false);
+                 }
+             }
+             
+             // Restore canvas context after drawing everything
+             ctx.restore();
             
             // Only update DOM when counts change to avoid reflow
             const allySpan = document.getElementById('ally-count');

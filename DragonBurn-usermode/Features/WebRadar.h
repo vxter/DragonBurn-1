@@ -37,6 +37,14 @@ namespace WebRadar
         float offsetY;
     };
 
+    struct BombData
+    {
+        Vec3 position;
+        bool isPlanted;
+        int bombSite;  // 0=A, 1=B
+        bool isBeingDefused;
+    };
+
     class WebRadarManager
     {
     public:
@@ -50,7 +58,8 @@ namespace WebRadar
             const std::vector<std::pair<int, CEntity>>& entities,
             const CEntity& localEntity,
             int localPlayerControllerIndex,
-            DWORD tickCount);
+            DWORD tickCount,
+            const BombData* bombData = nullptr);
 
         bool IsEnabled() const;
         void SetEnabled(bool enabled);
@@ -61,7 +70,8 @@ namespace WebRadar
             const MapData& mapData,
             int localTeamId,
             DWORD tickCount,
-            int localPlayerIndex);
+            int localPlayerIndex,
+            const BombData* bombData = nullptr);
 
         std::unique_ptr<WebServer> m_server;
         bool m_initialized;
