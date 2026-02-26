@@ -139,23 +139,37 @@ void Cheats::Run()
 			// Read planted C4 address
 			if (memoryManager.ReadMemory<uintptr_t>(gGame.GetClientDLLAddress() + Offset.PlantedC4, plantedC4) && plantedC4)
 			{
+				Log::Fine("PlantedC4 offset found: " + std::to_string(plantedC4));
+				
 				// Dereference to get actual C4 entity pointer
 				uintptr_t c4Entity = 0;
 				if (memoryManager.ReadMemory<uintptr_t>(plantedC4, c4Entity) && c4Entity)
 				{
-					// Read bomb entity - create a CEntity object and update it
-					CEntity bombEntity;
-					if (bombEntity.UpdatePawn(c4Entity))
+					Log::Fine("C4 entity found: " + std::to_string(c4Entity));
+					
+					// Read bomb position directly from entity + Pawn.Pos offset
+					Vec3 bombPos{};
+					if (memoryManager.ReadMemory<Vec3>(c4Entity + Offset.Pawn.Pos, bombPos))
 					{
-						bombData.position = bombEntity.Pawn.Pos;
+						Log::Fine("Bomb position read: X=" + std::to_string(bombPos.x) + " Y=" + std::to_string(bombPos.y) + " Z=" + std::to_string(bombPos.z));
+						bombData.position = bombPos;
 						bombData.isPlanted = true;
 						
 						// Read bomb site
 						memoryManager.ReadMemory<int>(c4Entity + Offset.C4.m_nBombSite, bombData.bombSite);
+						Log::Fine("Bomb site: " + std::to_string(bombData.bombSite));
 						
 						// Read defuse status
 						memoryManager.ReadMemory<bool>(c4Entity + Offset.C4.m_bBeingDefused, bombData.isBeingDefused);
 					}
+					else
+					{
+						Log::Warning("Failed to read bomb position");
+					}
+				}
+				else
+				{
+					Log::Warning("Failed to dereference C4 entity");
 				}
 			}
 			
