@@ -546,6 +546,7 @@
              if (data.bomb && data.bomb.position) {
                  const bombPos = worldToRadar(data.bomb.position.x, data.bomb.position.y);
                  const isBombOnCanvas = bombPos.x >= 0 && bombPos.x <= 1024 && bombPos.y >= 0 && bombPos.y <= 1024;
+                 console.log('Bomb world pos:', data.bomb.position, 'Radar pos:', bombPos, 'On canvas:', isBombOnCanvas);
                  if (isBombOnCanvas) {
                      drawBomb(bombPos.x, bombPos.y, data.bomb.bombSite || 0, data.bomb.isBeingDefused || false);
                  }
@@ -1043,18 +1044,23 @@
             document.getElementById('connection-text').textContent = 'Disconnected'; 
         };
         eventSource.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.map && data.map.name) updateMapBackground(data.map.name);
-                
-                // Update player data for interpolation
-                lastPlayerData = currentPlayerData;
-                currentPlayerData = data;
-                lastUpdateTime = Date.now();
-                
-                // Don't render here - let the animation loop handle it
-            } catch (e) { console.error('Parse error:', e); }
-        };
+             try {
+                 const data = JSON.parse(event.data);
+                 if (data.map && data.map.name) updateMapBackground(data.map.name);
+                 
+                 // Log bomb data for debugging
+                 if (data.bomb) {
+                    console.log('Bomb data received:', data.bomb);
+                 }
+                 
+                 // Update player data for interpolation
+                 lastPlayerData = currentPlayerData;
+                 currentPlayerData = data;
+                 lastUpdateTime = Date.now();
+                 
+                 // Don't render here - let the animation loop handle it
+             } catch (e) { console.error('Parse error:', e); }
+         };
         
         // Start animation loop
         currentPlayerData = {};

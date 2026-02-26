@@ -143,11 +143,11 @@ void Cheats::Run()
 				uintptr_t c4Entity = 0;
 				if (memoryManager.ReadMemory<uintptr_t>(plantedC4, c4Entity) && c4Entity)
 				{
-					// Read bomb entity position and data
-					Vec3 bombPos{};
-					if (memoryManager.ReadMemory<Vec3>(c4Entity + Offset.Pawn.Pos, bombPos))
+					// Read bomb entity - create a CEntity object and update it
+					CEntity bombEntity;
+					if (bombEntity.UpdatePawn(c4Entity))
 					{
-						bombData.position = bombPos;
+						bombData.position = bombEntity.Pawn.Pos;
 						bombData.isPlanted = true;
 						
 						// Read bomb site
