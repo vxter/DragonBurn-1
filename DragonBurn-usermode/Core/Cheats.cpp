@@ -144,27 +144,18 @@ void Cheats::Run()
 				uintptr_t c4Entity = 0;
 				if (memoryManager.ReadMemory<uintptr_t>(plantedC4, c4Entity) && c4Entity)
 				{
-					// Read bomb site and defuse status first to confirm we have valid entity
+					// Read bomb site to confirm we have a valid C4 entity
 					int bombSite = 0;
-					bool isDefusing = false;
-					
-					if (memoryManager.ReadMemory<int>(c4Entity + Offset.C4.m_nBombSite, bombSite))
+					if (memoryManager.ReadMemory<int>(c4Entity + Offset.C4.m_nBombSite, bombSite) && (bombSite == 0 || bombSite == 1))
 					{
-						// We have a valid C4 entity, now try to get position
-						// The position must be readable from the C4 entity structure
-						Vec3 bombPos{};
-						
-						// Try to read position from the C4 entity using Pawn.Pos offset
-						if (memoryManager.ReadMemory<Vec3>(c4Entity + Offset.Pawn.Pos, bombPos))
+						// C4 is not a PlayerPawn, so Pawn.Pos won't work.
+						// Read position via: C4 entity -> m_pGameSceneNode -> m_vecAbsOrigin
+						DWORD64 gameSceneNode = 0;
+						if (memoryManager.ReadMemory<DWORD64>(c4Entity + Offset.Pawn.GameSceneNode, gameSceneNode) && gameSceneNode)
 						{
-							// Log position for debugging
-							Log::Fine("Planted bomb position: X=" + std::to_string(bombPos.x) + 
-									" Y=" + std::to_string(bombPos.y) + 
-									" Z=" + std::to_string(bombPos.z) + 
-									" Site=" + std::to_string(bombSite));
-							
-							// Only use position if it's not (0,0,0) - that indicates invalid offset
-							if (bombPos.x != 0 || bombPos.y != 0 || bombPos.z != 0)
+							Vec3 bombPos{};
+							// m_vecAbsOrigin is at offset 0xD0 (208) in CGameSceneNode
+							if (memoryManager.ReadMemory<Vec3>(gameSceneNode + 0xD0, bombPos))
 							{
 								bombData.position = bombPos;
 								bombData.isPlanted = true;
@@ -172,20 +163,6 @@ void Cheats::Run()
 								memoryManager.ReadMemory<bool>(c4Entity + Offset.C4.m_bBeingDefused, bombData.isBeingDefused);
 								bombFound = true;
 							}
-							else
-							{
-								Log::Warning("Planted bomb detected but position is (0,0,0) - offset may be incorrect");
-								// Store the bomb site info even if position is invalid, so we know bomb is planted
-								bombData.bombSite = bombSite;
-								bombData.isPlanted = true;
-								bombData.position = {0, 0, 0};  // Placeholder
-								memoryManager.ReadMemory<bool>(c4Entity + Offset.C4.m_bBeingDefused, bombData.isBeingDefused);
-								// Don't mark as found since position is invalid
-							}
-						}
-						else
-						{
-							Log::Warning("Failed to read bomb position from C4 entity at offset Pawn.Pos");
 						}
 					}
 				}
