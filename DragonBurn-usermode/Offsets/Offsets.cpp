@@ -79,17 +79,18 @@ void Offsets::SetOffsets(const std::string& offsetsData, const std::string& butt
      this->Pawn.m_pWeaponServices = SafeGetDWORD(client_dllJson, {"C_BasePlayerPawn", "fields", "m_pWeaponServices"});
      this->Pawn.m_flEmitSoundTime = SafeGetDWORD(client_dllJson, {"C_CSPlayerPawn", "fields", "m_flEmitSoundTime"});
  
-     this->GlobalVar.RealTime = 0x00;
-     this->GlobalVar.FrameCount = 0x04;
-     this->GlobalVar.MaxClients = 0x10;
-     this->GlobalVar.IntervalPerTick = 0x14;
-     this->GlobalVar.CurrentTime = 0x30;
-     this->GlobalVar.CurrentTime2 = 0x38;
-     this->GlobalVar.TickCount = 0x48;
-     this->GlobalVar.IntervalPerTick2 = 0x44;
-     this->GlobalVar.CurrentNetchan = 0x0048;
-     this->GlobalVar.CurrentMap = 0x0180;
-     this->GlobalVar.CurrentMapName = 0x0188;
+     // Try to fetch GlobalVar offsets from JSON, fall back to defaults
+     this->GlobalVar.RealTime = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_RealTime"}, 0x00);
+     this->GlobalVar.FrameCount = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_FrameCount"}, 0x04);
+     this->GlobalVar.MaxClients = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_MaxClients"}, 0x10);
+     this->GlobalVar.IntervalPerTick = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_IntervalPerTick"}, 0x14);
+     this->GlobalVar.CurrentTime = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_CurrentTime"}, 0x30);
+     this->GlobalVar.CurrentTime2 = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_CurrentTime2"}, 0x38);
+     this->GlobalVar.TickCount = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_TickCount"}, 0x48);
+     this->GlobalVar.IntervalPerTick2 = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_IntervalPerTick2"}, 0x44);
+     this->GlobalVar.CurrentNetchan = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_CurrentNetchan"}, 0x0048);
+     this->GlobalVar.CurrentMap = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_CurrentMap"}, 0x0180);
+     this->GlobalVar.CurrentMapName = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_CurrentMapName"}, 0x0188);
 
     this->PlayerController.m_nTickBase = SafeGetDWORD(client_dllJson, {"CBasePlayerController", "fields", "m_nTickBase"});
     this->PlayerController.m_steamID = SafeGetDWORD(client_dllJson, {"CBasePlayerController", "fields", "m_steamID"});
