@@ -79,7 +79,7 @@ void Offsets::SetOffsets(const std::string& offsetsData, const std::string& butt
      this->Pawn.m_pWeaponServices = SafeGetDWORD(client_dllJson, {"C_BasePlayerPawn", "fields", "m_pWeaponServices"});
      this->Pawn.m_flEmitSoundTime = SafeGetDWORD(client_dllJson, {"C_CSPlayerPawn", "fields", "m_flEmitSoundTime"});
  
-     this->GlobalVar.RealTime = 0x20;
+     this->GlobalVar.RealTime = 0x00;
      this->GlobalVar.FrameCount = 0x04;
      this->GlobalVar.MaxClients = 0x10;
      this->GlobalVar.IntervalPerTick = 0x14;
@@ -121,7 +121,7 @@ void Offsets::UpdateOffsets()
     std::string offsets, buttons, client_dll;
     std::string gameBuildNum = std::to_string
     (
-        json::parse(Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/info.json"))["build_number"]
+        json::parse(Web::Get("https://raw.githubusercontent.com/sezzyaep/CS2-OFFSETS/refs/heads/main/info.json"))["build_number"]
         .get<int>()
     );
 
@@ -140,8 +140,7 @@ void Offsets::UpdateOffsets()
         if (GamaDataStorage.contains("build-number") && !GamaDataStorage["build-number"].is_null())
         {
             std::string storedBuildNum = GamaDataStorage["build-number"].get<std::string>();
-            // Use strict equality check instead of substring search to catch mid-build offset changes
-            if (storedBuildNum != gameBuildNum)
+            if (gameBuildNum.find(storedBuildNum) == std::string::npos)
             {
                 printf("[i] Offsets outdated - Version mismatch detected\n");
                 printf("[i] Stored build: %s\n", storedBuildNum.c_str());
@@ -166,9 +165,9 @@ void Offsets::UpdateOffsets()
     catch (...)
     {
         printf("[i] Downloading latest offsets from cloud (Build: %s)...\n", gameBuildNum.c_str());
-        offsets = Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/offsets.json");
-        buttons = Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/buttons.json");
-        client_dll = Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/client_dll.json");
+        offsets = Web::Get("https://raw.githubusercontent.com/sezzyaep/CS2-OFFSETS/refs/heads/main/offsets.json");
+        buttons = Web::Get("https://raw.githubusercontent.com/sezzyaep/CS2-OFFSETS/refs/heads/main/buttons.json");
+        client_dll = Web::Get("https://raw.githubusercontent.com/sezzyaep/CS2-OFFSETS/refs/heads/main/client_dll.json");
 
         storage::WriteStorageFile("offsets.json", offsets);
         storage::WriteStorageFile("buttons.json", buttons);
