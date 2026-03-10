@@ -79,7 +79,7 @@ void Offsets::SetOffsets(const std::string& offsetsData, const std::string& butt
      this->Pawn.m_pWeaponServices = SafeGetDWORD(client_dllJson, {"C_BasePlayerPawn", "fields", "m_pWeaponServices"});
      this->Pawn.m_flEmitSoundTime = SafeGetDWORD(client_dllJson, {"C_CSPlayerPawn", "fields", "m_flEmitSoundTime"});
  
-     this->GlobalVar.RealTime = SafeGetDWORD(offsetsJson, {"client.dll", "dwGlobalVars_RealTime"}, 0x00);
+     this->GlobalVar.RealTime = 0x20;
      this->GlobalVar.FrameCount = 0x04;
      this->GlobalVar.MaxClients = 0x10;
      this->GlobalVar.IntervalPerTick = 0x14;
