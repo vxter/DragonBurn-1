@@ -1,6 +1,7 @@
 #include "Offsets.h"
 #include "../Core/Init.h"
 #include "../Helpers/StorageMgr.h"
+#include <chrono>
 
 Offsets::Offsets() {}
 
@@ -119,9 +120,15 @@ void Offsets::SetOffsets(const std::string& offsetsData, const std::string& butt
 void Offsets::UpdateOffsets()
 {
     std::string offsets, buttons, client_dll;
+    
+    // Add cache-buster with current timestamp to force fresh fetch
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::string cacheBuster = std::to_string(time / 300); // Change every 5 minutes
+    
     std::string gameBuildNum = std::to_string
     (
-        json::parse(Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/info.json"))["build_number"]
+        json::parse(Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/info.json?cb=" + cacheBuster))["build_number"]
         .get<int>()
     );
 
@@ -165,9 +172,9 @@ void Offsets::UpdateOffsets()
     catch (...)
     {
         printf("[i] Downloading latest offsets from cloud (Build: %s)...\n", gameBuildNum.c_str());
-        offsets = Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/offsets.json");
-        buttons = Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/buttons.json");
-        client_dll = Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/client_dll.json");
+        offsets = Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/offsets.json?cb=" + cacheBuster);
+        buttons = Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/buttons.json?cb=" + cacheBuster);
+        client_dll = Web::Get("https://raw.githubusercontent.com/vxter/cs2-offsets-output-test/refs/heads/main/client_dll.json?cb=" + cacheBuster);
 
         storage::WriteStorageFile("offsets.json", offsets);
         storage::WriteStorageFile("buttons.json", buttons);
