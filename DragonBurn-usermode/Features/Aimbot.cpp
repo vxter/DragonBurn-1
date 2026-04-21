@@ -2,6 +2,8 @@
 #undef max()
 #undef min()
 
+#include <cmath>
+
 void AimControl::switchToggle()
 {
     LegitBotConfig::AimAlways = !LegitBotConfig::AimAlways;
@@ -72,25 +74,32 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
     if (onlyAuto && !CheckAutoMode(curWeapon))
         return;
 
-    if (Local.Pawn.ShotsFired <= AimBullet - 1 && AimBullet != 0)
+    // If ShotsFired reads as 0/uninitialized, don't block aiming.
+    if (AimBullet != 0 && Local.Pawn.ShotsFired != 0 && Local.Pawn.ShotsFired <= AimBullet - 1)
     {
         HasTarget = false;
         return;
     }
 
-    if (AimControl::ScopeOnly)
-    {
-        bool isScoped;
-        memoryManager.ReadMemory<bool>(Local.Pawn.Address + Offset.Pawn.isScoped, isScoped);
-        if (!isScoped && TriggerBot::CheckScopeWeapon(curWeapon))
-        {
-            HasTarget = false;
-            return;
-        }
-    }
+	if (AimControl::ScopeOnly)
+	{
+		bool isScoped;
+		if (memoryManager.ReadMemory<bool>(Local.Pawn.Address + Offset.Pawn.isScoped, isScoped))
+		{
+			if (!isScoped && TriggerBot::CheckScopeWeapon(curWeapon))
+			{
+				HasTarget = false;
+				return;
+			}
+		}
+	}
 
-    if (!IgnoreFlash && Local.Pawn.FlashDuration > 0.f)
-        return;
+	// Only treat flash as blocking if it's plausibly initialized.
+	if (!IgnoreFlash)
+	{
+		if (Local.Pawn.FlashDuration > 0.f && Local.Pawn.FlashDuration < 5.0f)
+			return;
+	}
 
     const int ListSize = AimPosList.size();
     if (ListSize == 0) {
@@ -98,9 +107,25 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
         return;
     }
 
+    static ULONGLONG lastAimDbg = 0;
+	if (!std::isfinite(LocalPos.x) || !std::isfinite(LocalPos.y) || !std::isfinite(LocalPos.z))
+	{
+		if (GetTickCount64() - lastAimDbg > 3000)
+		{
+			lastAimDbg = GetTickCount64();
+			std::printf("[AimDbg] LocalPos non-finite: (%.3f,%.3f,%.3f)\n", LocalPos.x, LocalPos.y, LocalPos.z);
+		}
+		HasTarget = false;
+		return;
+	}
+
     float BestNorm = MAXV;
     int BestTargetIndex = -1;
     Vec2 Angles{ 0, 0 };
+	int invalidTargets = 0;
+	int invalidOpp = 0;
+	int invalidDistance = 0;
+	int invalidNorm = 0;
 
     const int ScreenCenterX = Gui.Window.Size.x / 2;
     const int ScreenCenterY = Gui.Window.Size.y / 2;
@@ -108,7 +133,20 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
     for (int i = 0; i < ListSize; i++)
     {
         Vec3 OppPos = AimPosList[i] - LocalPos;
-        const float Distance = sqrt(OppPos.x * OppPos.x + OppPos.y * OppPos.y);
+		if (!std::isfinite(OppPos.x) || !std::isfinite(OppPos.y) || !std::isfinite(OppPos.z))
+		{
+			++invalidTargets;
+			++invalidOpp;
+			continue;
+		}
+
+		const float Distance = sqrt(OppPos.x * OppPos.x + OppPos.y * OppPos.y);
+		if (!std::isfinite(Distance))
+		{
+			++invalidTargets;
+			++invalidDistance;
+			continue;
+		}
         if (LegitBotConfig::RCS)
         {
             RCS::UpdateAngles(Local, Angles);
@@ -136,6 +174,12 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
         const float Yaw = atan2f(OppPos.y, OppPos.x) * 57.295779513f - Local.Pawn.ViewAngle.y;
         const float Pitch = -atan(OppPos.z / Distance) * 57.295779513f - Local.Pawn.ViewAngle.x;
         const float Norm = sqrt(Yaw * Yaw + Pitch * Pitch);
+		if (!std::isfinite(Norm))
+		{
+			++invalidTargets;
+			++invalidNorm;
+			continue;
+		}
 
         if (Norm < BestNorm) {
             BestNorm = Norm;
@@ -145,12 +189,27 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
 
     if (BestNorm >= AimFov || BestNorm <= AimFovMin || BestTargetIndex == -1) {
         HasTarget = false;
+		if (GetTickCount64() - lastAimDbg > 3000)
+		{
+			lastAimDbg = GetTickCount64();
+			Vec3 sample = AimPosList.empty() ? Vec3{ 0,0,0 } : AimPosList[0];
+			std::printf("[AimDbg] abort fov: BestNorm=%.3f BestIndex=%d AimFov=%.3f AimFovMin=%.3f ListSize=%d invalid=%d (opp=%d dist=%d norm=%d) LocalPos=(%.3f,%.3f,%.3f) SampleTarget=(%.3f,%.3f,%.3f)\n",
+				BestNorm, BestTargetIndex, AimFov, AimFovMin, ListSize, invalidTargets,
+				invalidOpp, invalidDistance, invalidNorm,
+				LocalPos.x, LocalPos.y, LocalPos.z,
+				sample.x, sample.y, sample.z);
+		}
         return;
     }
 
     Vec2 ScreenPos;
     if (!gGame.View.WorldToScreen(AimPosList[BestTargetIndex], ScreenPos)) {
         HasTarget = false;
+		if (GetTickCount64() - lastAimDbg > 3000)
+		{
+			lastAimDbg = GetTickCount64();
+			std::printf("[AimDbg] abort W2S failed idx=%d\n", BestTargetIndex);
+		}
         return;
     }
 
@@ -182,6 +241,11 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
     {
         mouse_event(MOUSEEVENTF_MOVE, TargetX, TargetY, NULL, NULL);
         lastAimTime = currentTick;
+		if (currentTick - lastAimDbg > 3000)
+		{
+			lastAimDbg = currentTick;
+			std::printf("[AimDbg] move TargetX=%.2f TargetY=%.2f idx=%d\n", TargetX, TargetY, BestTargetIndex);
+		}
     }
 }
 

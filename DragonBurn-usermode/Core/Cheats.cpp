@@ -15,6 +15,7 @@
 #include <future>
 #include <iostream>
 #include <cstdio>
+#include <cmath>
 
 #include "Cheats.h"
 #include "Render.h"
@@ -136,10 +137,16 @@ void Cheats::Run()
 		Trigger(LocalEntity, LocalPlayerControllerIndex);
 
 	// run aim / tick-based logic
-	if (m_currentTick != m_previousTick)
+	const bool canAimNow = canProcessEntities && !AimPosList.empty();
+	const bool tickChanged = (m_currentTick != m_previousTick);
+	const bool tickStuck = (m_currentTick == 0 && m_previousTick == 0);
+
+	if (tickChanged || (tickStuck && canAimNow))
 	{
 		if (canProcessEntities)
+		{
 			AIM(LocalEntity, AimPosList);
+		}
 		
 		if (canProcessEntities)
 		{
@@ -378,7 +385,7 @@ std::vector<EntityResult> Cheats::ProcessEntities(CEntity& localEntity, int& loc
 			continue;
 
 		// skip teammates if team check enabled
-		if (MenuConfig::TeamCheck && entity.Controller.TeamID == localEntity.Controller.TeamID)
+		if (MenuConfig::TeamCheck && entity.Pawn.TeamID == localEntity.Pawn.TeamID)
 			continue;
 
 		// check if in screen
@@ -456,19 +463,29 @@ void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& loca
 			float aimFovTan = tan(AimControl::AimFov * DEG_TO_RAD / 2.f);
 			float aimFovRadius = (aimFovTan / staticFovTan) * halfWindowSize;
 
+			const auto& bonePosList = entity.GetBone().BonePosList;
+			if (bonePosList.empty())
+				continue;
 			for (size_t i = 0; i < AimControl::HitboxList.size(); ++i) {
 				int hitboxID = AimControl::HitboxList[i];
+				if (hitboxID < 0 || static_cast<size_t>(hitboxID) >= bonePosList.size())
+					continue;
 
-				float distanceToSight = entity.GetBone().BonePosList[hitboxID].ScreenPos.DistanceTo(
+				float distanceToSight = bonePosList[hitboxID].ScreenPos.DistanceTo(
 					{ screenCenter.x, screenCenter.y });
 
 				if (distanceToSight < minDistance && distanceToSight <= aimFovRadius) {
 					minDistance = distanceToSight;
 
-					if (!LegitBotConfig::VisibleCheck ||
+					bool maskUninitialized = LegitBotConfig::VisibleCheck &&
+						entity.Pawn.bSpottedByMask == 0 &&
+						localEntity.Pawn.bSpottedByMask == 0;
+					if (!LegitBotConfig::VisibleCheck || maskUninitialized ||
 						entity.Pawn.bSpottedByMask & (DWORD64(1) << (localPlayerControllerIndex)) ||
 						localEntity.Pawn.bSpottedByMask & (DWORD64(1) << (entityIndex))) {
-						Vec3 tempPos = entity.GetBone().BonePosList[hitboxID].Pos;
+						Vec3 tempPos = bonePosList[hitboxID].Pos;
+						if (!std::isfinite(tempPos.x) || !std::isfinite(tempPos.y) || !std::isfinite(tempPos.z))
+							continue;
 
 						bestAimPos = tempPos;
 						aimPosList.push_back(bestAimPos);
@@ -540,7 +557,7 @@ void Menu()
 void Visual(const CEntity& LocalEntity)
 {
 	// Fov circle
-	if (LocalEntity.Controller.TeamID != 0 && !MenuConfig::ShowMenu)
+	if (LocalEntity.Pawn.TeamID != 0 && !MenuConfig::ShowMenu)
 		Render::DrawFovCircle(ImGui::GetBackgroundDrawList(), LocalEntity);
 
 	// Fov line
@@ -585,8 +602,16 @@ void AIM(const CEntity& LocalEntity, std::vector<Vec3>& AimPosList) {
 	bool keyHeld = (GetAsyncKeyState(AimControl::HotKey) & 0x8000) != 0;
 	bool shouldAim = LegitBotConfig::AimAlways || keyHeld;
 
+	// Camera position reads can drift; fall back to entity origin.
+	Vec3 localAimPos = LocalEntity.Pawn.CameraPos;
+	if (!std::isfinite(localAimPos.x) || !std::isfinite(localAimPos.y) || !std::isfinite(localAimPos.z) ||
+		std::fabs(localAimPos.x) > 100000.0f || std::fabs(localAimPos.y) > 100000.0f || std::fabs(localAimPos.z) > 100000.0f)
+	{
+		localAimPos = LocalEntity.Pawn.Pos;
+	}
+
 	if (shouldAim && !AimPosList.empty())
-		AimControl::AimBot(LocalEntity, LocalEntity.Pawn.CameraPos, AimPosList);
+		AimControl::AimBot(LocalEntity, localAimPos, AimPosList);
 
 	if (LegitBotConfig::AimToggleMode && keyHeld && currentTick - lastTick >= 200) {
 		AimControl::switchToggle();
