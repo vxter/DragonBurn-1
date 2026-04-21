@@ -30,6 +30,9 @@ public:
 		DWORD Left;
 		DWORD Right;
 		DWORD Attack;
+		DWORD Forward;
+		DWORD Back;
+		DWORD Duck;
 	}Buttons;
 
 	struct
@@ -69,6 +72,7 @@ public:
 		DWORD m_bWaitForNoAttack;
 		DWORD m_pWeaponServices;
 		DWORD m_flEmitSoundTime;
+		DWORD m_pMovementServices;
 
 	} Pawn;
 

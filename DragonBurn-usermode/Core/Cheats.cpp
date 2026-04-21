@@ -14,6 +14,7 @@
 #include <thread>
 #include <future>
 #include <iostream>
+#include <cstdio>
 
 #include "Cheats.h"
 #include "Render.h"
@@ -36,7 +37,7 @@ void Menu();
 void Visual(const CEntity&);
 void Radar(Base_Radar, const CEntity&);
 void Trigger(const CEntity&, const int&);
-void AIM(const CEntity&, std::vector<Vec3>);
+void AIM(const CEntity&, std::vector<Vec3>&);
 void MiscFuncs(CEntity&);
 void RenderCrosshair(ImDrawList*, const CEntity&);
 void RadarSetting(Base_Radar&);
@@ -54,9 +55,9 @@ void Cheats::Run()
 	}
 #endif
 
-	// Update matrix
-	if (!memoryManager.ReadMemory(gGame.GetMatrixAddress(), gGame.View.Matrix,64))
-		return;
+	// Update matrix (do not hard-fail the whole frame)
+	// If matrix read temporarily fails, we still want spectator list/radar/etc.
+	(void)memoryManager.ReadMemory(gGame.GetMatrixAddress(), gGame.View.Matrix, 64);
 
 	// Update GlobalVars every frame
 	g_globalVars->UpdateGlobalvars();
@@ -67,47 +68,59 @@ void Cheats::Run()
 	DWORD64 LocalControllerAddress = 0;
 	DWORD64 LocalPawnAddress = 0;
 
-	if (!memoryManager.ReadMemory(gGame.GetLocalControllerAddress(), LocalControllerAddress))
-		return;
-	if (!memoryManager.ReadMemory(gGame.GetLocalPawnAddress(), LocalPawnAddress))
-		return;
-
-	if (LocalPawnAddress == 0 || LocalControllerAddress == 0) {
-        cachedResults.clear();
-        return;
-    }
+	// Don't hard-fail the overlay if local pointers can't be read.
+	memoryManager.ReadMemory(gGame.GetLocalControllerAddress(), LocalControllerAddress);
+	memoryManager.ReadMemory(gGame.GetLocalPawnAddress(), LocalPawnAddress);
+	if (LocalPawnAddress == 0 || LocalControllerAddress == 0)
+		cachedResults.clear();
 
 	// LocalEntity
 	CEntity LocalEntity;
 	int LocalPlayerControllerIndex = 0;
 	LocalEntity.UpdateClientData();
-	if (!LocalEntity.UpdateController(LocalControllerAddress))
-		return;
-	if (!LocalEntity.UpdatePawn(LocalPawnAddress) && !MenuConfig::WorkInSpec)
-		return;
+	const bool localControllerOk = LocalEntity.UpdateController(LocalControllerAddress);
+	const bool localPawnOk = LocalEntity.UpdatePawn(LocalPawnAddress);
+
+	// If we can't resolve core pawn data, we still keep running to draw menu overlays.
+	// (Watermark and spectator list need only to reach MiscFuncs.)
+	if (!localControllerOk && LocalEntity.Pawn.Address == 0)
+		cachedResults.clear();
+	bool canProcessEntities = localPawnOk && LocalEntity.Pawn.Address != 0;
+	bool canTrigger = LegitBotConfig::TriggerBot && LocalEntity.Pawn.Address != 0 && LocalEntity.Controller.Address != 0;
 
 	// Update m_currentTick
-	bool success = memoryManager.ReadMemory<DWORD>(LocalEntity.Controller.Address + Offset.PlayerController.m_nTickBase, m_currentTick);
-	if (!success) {
-		m_currentTick = 0;
+	// Trigger/AIM are gated on tick change; ensure we keep reading tick base whenever we have a valid controller pointer.
+	if (LocalEntity.Controller.Address != 0)
+	{
+		bool success = memoryManager.ReadMemory<DWORD>(LocalEntity.Controller.Address + Offset.PlayerController.m_nTickBase, m_currentTick);
+		if (!success)
+			m_currentTick = 0;
 	}
+	else
+		m_currentTick = 0;
 
 	// aimbot data
 	std::vector<Vec3> AimPosList;
 
 	// radar data
 	Base_Radar GameRadar;
-	if ((RadarCFG::ShowRadar && LocalEntity.Controller.TeamID != 0) || (RadarCFG::ShowRadar && MenuConfig::ShowMenu))
+	if (canProcessEntities && ((RadarCFG::ShowRadar && LocalEntity.Controller.TeamID != 0) || (RadarCFG::ShowRadar && MenuConfig::ShowMenu)))
 		RadarSetting(GameRadar);
 
-	// process entities
-	auto entityResults = ProcessEntities(LocalEntity, LocalPlayerControllerIndex);
-	
-	// render, collect aim data
-	HandleEnts(entityResults, LocalEntity, LocalPlayerControllerIndex, GameRadar, AimPosList);
+	if (canProcessEntities)
+	{
+		// process entities
+		auto entityResults = ProcessEntities(LocalEntity, LocalPlayerControllerIndex);
 
-	Visual(LocalEntity);
-	Radar(GameRadar, LocalEntity);
+		// render, collect aim data
+		HandleEnts(entityResults, LocalEntity, LocalPlayerControllerIndex, GameRadar, AimPosList);
+	}
+
+	if (canProcessEntities)
+	{
+		Visual(LocalEntity);
+		Radar(GameRadar, LocalEntity);
+	}
 	MiscFuncs(LocalEntity);
 
 	int currentFPS = static_cast<int>(ImGui::GetIO().Framerate);
@@ -116,18 +129,26 @@ void Cheats::Run()
 		int FrameWait = round(1000.0f / MenuConfig::RenderFPS);
 		std::this_thread::sleep_for(std::chrono::milliseconds(FrameWait));
 	}
-	
-	// run trigger & aim every new tick
+
+	// Run trigger every frame when the hotkey (or TriggerAlways) is active.
+	// Aim remains tick-gated.
+	if (canTrigger)
+		Trigger(LocalEntity, LocalPlayerControllerIndex);
+
+	// run aim / tick-based logic
 	if (m_currentTick != m_previousTick)
 	{
-		Trigger(LocalEntity, LocalPlayerControllerIndex);
-		AIM(LocalEntity, AimPosList);
+		if (canProcessEntities)
+			AIM(LocalEntity, AimPosList);
 		
-		std::vector<CEntity> allEntities;
-		for (const auto& pair : cachedResults) {
-			allEntities.push_back(pair.second);
+		if (canProcessEntities)
+		{
+			std::vector<CEntity> allEntities;
+			for (const auto& pair : cachedResults) {
+				allEntities.push_back(pair.second);
+			}
+			SpecList::GetSpectatorList(allEntities, LocalEntity);
 		}
-		SpecList::GetSpectatorList(allEntities, LocalEntity);
 		
 		// Update web radar
 		if (WebRadarCFG::Enabled && WebRadar::g_webRadar && WebRadar::g_webRadar->IsEnabled())
@@ -547,25 +568,27 @@ void Trigger(const CEntity& LocalEntity, const int& LocalPlayerControllerIndex)
 {
 	// TriggerBot
 	if (LegitBotConfig::TriggerBot && (GetAsyncKeyState(TriggerBot::HotKey) || LegitBotConfig::TriggerAlways))
+	{
 		TriggerBot::Run(LocalEntity, LocalPlayerControllerIndex);
+	}
 }
 
-void AIM(const CEntity& LocalEntity, std::vector<Vec3> AimPosList)
-{
-	DWORD lastTick = 0;
-	DWORD currentTick = GetTickCount64();
+void AIM(const CEntity& LocalEntity, std::vector<Vec3>& AimPosList) {
+	static ULONGLONG lastTick = 0;
+	ULONGLONG currentTick = GetTickCount64();
 
 	if (!LegitBotConfig::AimBot) {
 		RCS::RecoilControl(LocalEntity);
 		return;
 	}
 
-	bool shouldAim = LegitBotConfig::AimAlways || GetAsyncKeyState(AimControl::HotKey);
+	bool keyHeld = (GetAsyncKeyState(AimControl::HotKey) & 0x8000) != 0;
+	bool shouldAim = LegitBotConfig::AimAlways || keyHeld;
+
 	if (shouldAim && !AimPosList.empty())
 		AimControl::AimBot(LocalEntity, LocalEntity.Pawn.CameraPos, AimPosList);
 
-	if (LegitBotConfig::AimToggleMode && (GetAsyncKeyState(AimControl::HotKey) & 0x8000) &&
-		currentTick - lastTick >= 200) {
+	if (LegitBotConfig::AimToggleMode && keyHeld && currentTick - lastTick >= 200) {
 		AimControl::switchToggle();
 		lastTick = currentTick;
 	}

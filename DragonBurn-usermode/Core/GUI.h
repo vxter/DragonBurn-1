@@ -12,6 +12,7 @@
 #include "..\Resources\Language.h"
 #include "..\Resources\Images.h"
 #include "../Helpers/KeyManager.h"
+#include "../Helpers/InputManager.h"
 
 #include "../Features/ESP.h"
 
@@ -42,6 +43,17 @@ bool checkbox2 = false;
 bool checkbox3 = false;
 bool checkbox4 = false;
 bool checkbox5 = false;
+
+// Input control button states
+struct InputButtonStates
+{
+	bool forward = false;
+	bool backward = false;
+	bool left = false;
+	bool right = false;
+	bool jump = false;
+	bool crouch = false;
+} inputStates;
 
 namespace GUI
 {
@@ -294,12 +306,12 @@ namespace GUI
 				Button3Pressed = false;
 				Button4Pressed = true;
 			}
-			ImGui::GetWindowDrawList()->AddRect(
-				ImVec2(MenuConfig::WCS.Button4Pos.x + ImGui::GetWindowPos().x, MenuConfig::WCS.Button4Pos.y + ImGui::GetWindowPos().y),
-				ImVec2(MenuConfig::WCS.Button4Pos.x + buttonW + ImGui::GetWindowPos().x, MenuConfig::WCS.Button4Pos.y + buttonH + ImGui::GetWindowPos().y),
-				BorderColor, 0.f, ImDrawFlags_RoundCornersNone | ImDrawCornerFlags_Top | ImDrawCornerFlags_Bot, 1.f, true);
+		ImGui::GetWindowDrawList()->AddRect(
+			ImVec2(MenuConfig::WCS.Button4Pos.x + ImGui::GetWindowPos().x, MenuConfig::WCS.Button4Pos.y + ImGui::GetWindowPos().y),
+			ImVec2(MenuConfig::WCS.Button4Pos.x + buttonW + ImGui::GetWindowPos().x, MenuConfig::WCS.Button4Pos.y + buttonH + ImGui::GetWindowPos().y),
+			BorderColor, 0.f, ImDrawFlags_RoundCornersNone | ImDrawCornerFlags_Top | ImDrawCornerFlags_Bot, 1.f, true);
 
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 5);
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 5);
 
 			ImGui::SetCursorPos(MenuConfig::WCS.ChildPos);
 			
@@ -690,8 +702,20 @@ namespace GUI
 					PutSwitch(Text::Misc::AntiRecord.c_str(), 5.f, ImGui::GetFrameHeight() * 1.7, &MenuConfig::BypassOBS);
 					ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 5.f);
 
-					ImGui::NewLine();
-					if (ImGui::Button("Source Code", { 125.f, 25.f }))
+				ImGui::NewLine();
+				ImGui::Separator();
+				ImGui::TextDisabled("Extras");
+				if (ImGui::Button("Input Control", { 125.f, 25.f }))
+				{
+					MenuConfig::WCS.MenuPage = 4;
+					Button1Pressed = false;
+					Button2Pressed = false;
+					Button3Pressed = false;
+					Button4Pressed = true;
+				}
+
+				ImGui::NewLine();
+				if (ImGui::Button("Source Code", { 125.f, 25.f }))
 						Gui.OpenWebpage("https://github.com/ByteCorum/DragonBurn");
 					ImGui::SameLine();
 					if (ImGui::Button("Contact Author", { 125.f, 25.f }))
@@ -709,12 +733,97 @@ namespace GUI
 					ImGui::Columns(1);
 				}
 
-				if (MenuConfig::WCS.MenuPage == 3)
-				{
-					ConfigMenu::RenderCFGmenu();
-				}
-				ImGui::NewLine();
-			} ImGui::EndChild();
+			if (MenuConfig::WCS.MenuPage == 3)
+			{
+				ConfigMenu::RenderCFGmenu();
+			}
+
+			if (MenuConfig::WCS.MenuPage == 4)
+			{
+				ImGui::Text("Input Control");
+				ImGui::Separator();
+				ImGui::Spacing();
+
+				// Movement Controls
+				ImGui::TextDisabled("MOVEMENT");
+				ImGui::Spacing();
+
+			// Sends momentary key events using keybd_event like FastStop does.
+			// CS2 only responds to real hardware input, not pure memory writes.
+			auto SendKey = [](int vk, bool down) {
+				DWORD flags = down ? 0 : KEYEVENTF_KEYUP;
+				keybd_event(vk, MapVirtualKey(vk, MAPVK_VK_TO_VSC), flags, 0);
+			};
+
+			if (ImGui::Button(inputStates.forward  ? "[ON]  W - Forward"      : "[OFF] W - Forward",      ImVec2(ImGui::GetContentRegionAvail().x, 40)))
+			{
+				inputStates.forward = !inputStates.forward;
+				if (inputStates.forward) SendKey('W', true);
+				else SendKey('W', false);
+			}
+
+			if (ImGui::Button(inputStates.backward ? "[ON]  S - Backward"     : "[OFF] S - Backward",     ImVec2(ImGui::GetContentRegionAvail().x, 40)))
+			{
+				inputStates.backward = !inputStates.backward;
+				if (inputStates.backward) SendKey('S', true);
+				else SendKey('S', false);
+			}
+
+			if (ImGui::Button(inputStates.left     ? "[ON]  A - Strafe Left"  : "[OFF] A - Strafe Left",  ImVec2(ImGui::GetContentRegionAvail().x, 40)))
+			{
+				inputStates.left = !inputStates.left;
+				if (inputStates.left) SendKey('A', true);
+				else SendKey('A', false);
+			}
+
+			if (ImGui::Button(inputStates.right    ? "[ON]  D - Strafe Right" : "[OFF] D - Strafe Right", ImVec2(ImGui::GetContentRegionAvail().x, 40)))
+			{
+				inputStates.right = !inputStates.right;
+				if (inputStates.right) SendKey('D', true);
+				else SendKey('D', false);
+			}
+
+			ImGui::Spacing();
+			ImGui::TextDisabled("ACTIONS");
+			ImGui::Spacing();
+
+			if (ImGui::Button(inputStates.jump   ? "[ON]  SPACE - Jump"  : "[OFF] SPACE - Jump",  ImVec2(ImGui::GetContentRegionAvail().x, 40)))
+			{
+				inputStates.jump = !inputStates.jump;
+				if (inputStates.jump) SendKey(VK_SPACE, true);
+				else SendKey(VK_SPACE, false);
+			}
+
+			if (ImGui::Button(inputStates.crouch ? "[ON]  CTRL - Crouch" : "[OFF] CTRL - Crouch", ImVec2(ImGui::GetContentRegionAvail().x, 40)))
+			{
+				inputStates.crouch = !inputStates.crouch;
+				if (inputStates.crouch) SendKey(VK_CONTROL, true);
+				else SendKey(VK_CONTROL, false);
+			}
+
+			ImGui::Spacing();
+			ImGui::TextDisabled("ROTATION");
+			ImGui::Spacing();
+
+			if (ImGui::Button("Rotate Left  (-10 deg)", ImVec2(ImGui::GetContentRegionAvail().x / 2 - 5, 40)))
+			{
+				SendKey(VK_LEFT, true);
+				Sleep(10);
+				SendKey(VK_LEFT, false);
+			}
+
+			ImGui::SameLine();
+
+			if (ImGui::Button("Rotate Right (+10 deg)", ImVec2(ImGui::GetContentRegionAvail().x, 40)))
+			{
+				SendKey(VK_RIGHT, true);
+				Sleep(10);
+				SendKey(VK_RIGHT, false);
+			}
+			}
+
+			ImGui::NewLine();
+		} ImGui::EndChild();
 		} ImGui::End();
 
 		LoadDefaultConfig();

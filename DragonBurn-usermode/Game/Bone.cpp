@@ -1,5 +1,6 @@
 #include "Bone.h"
 
+
 bool CBone::UpdateAllBoneData(const DWORD64& EntityPawnAddress) {
     if (!EntityPawnAddress) return false;
     this->EntityPawnAddress = EntityPawnAddress;
@@ -10,44 +11,67 @@ bool CBone::UpdateAllBoneData(const DWORD64& EntityPawnAddress) {
 
     this->GameSceneNode = gameSceneNodeAddr;
 
-    uintptr_t boneArrayAddr;
-    if (!memoryManager.ReadMemory(gameSceneNodeAddr + Offset.Pawn.BoneArray, boneArrayAddr))
-        return false;
-
     constexpr size_t NUM_BONES = 30;
 
-    // Read bone data (position + rotation)
-    CBoneData IData[NUM_BONES];
-    if (!memoryManager.ReadMemory(boneArrayAddr, IData, NUM_BONES * sizeof(CBoneData)))
-        return false;
+    auto tryReadCandidate = [&](DWORD boneArrayOffset) -> bool {
+        uintptr_t boneArrayAddr = 0;
+        if (!memoryManager.ReadMemory(gameSceneNodeAddr + boneArrayOffset, boneArrayAddr) || boneArrayAddr == 0)
+            return false;
 
-    // Read original bone data (position only)
-    BoneJointData originalData[NUM_BONES];
-    if (!memoryManager.ReadMemory(boneArrayAddr, originalData, NUM_BONES * sizeof(BoneJointData)))
-        return false;
+        // Read bone data (position + rotation)
+        CBoneData IData[NUM_BONES];
+        if (!memoryManager.ReadMemory(boneArrayAddr, IData, NUM_BONES * sizeof(CBoneData)))
+            return false;
 
-    // Clear both lists
-    BonePosList.clear();
-    IBoneData.clear();
-    BonePosList.reserve(NUM_BONES);
-    IBoneData.reserve(NUM_BONES);
+        // Read original bone data (position + scale)
+        BoneJointData originalData[NUM_BONES];
+        if (!memoryManager.ReadMemory(boneArrayAddr, originalData, NUM_BONES * sizeof(BoneJointData)))
+            return false;
 
-    // Populate both data structures
-    for (size_t i = 0; i < NUM_BONES; ++i) {
-        // Get screen position
-        Vec2 screenPos;
-        bool visible = gGame.View.WorldToScreen(originalData[i].Pos, screenPos);
+        std::vector<BoneJointPos> tmpBonePos;
+        std::vector<CBoneData> tmpIBone;
+        tmpBonePos.reserve(NUM_BONES);
+        tmpIBone.reserve(NUM_BONES);
 
-        // Store original bone data (for compatibility)
-        BonePosList.push_back({ originalData[i].Pos, screenPos, visible });
+        size_t visibleCount = 0;
 
-        // Store bone data
-        IBoneData.push_back({
-            originalData[i].Pos,  // Location
-            originalData[i].Scale,  // Scale
-            IData[i].Rotation  // Rotation
+		for (size_t i = 0; i < NUM_BONES; ++i) {
+			Vec2 screenPos;
+			bool visible = gGame.View.WorldToScreen(originalData[i].Pos, screenPos);
+			if (visible)
+				visible = (screenPos.x >= 0.0f && screenPos.x <= Gui.Window.Size.x &&
+					screenPos.y >= 0.0f && screenPos.y <= Gui.Window.Size.y);
+			// Bone 27 produces incorrect box stretching.
+			if (i == 27)
+				visible = false;
+			if (visible)
+				++visibleCount;
+
+            tmpBonePos.push_back({ originalData[i].Pos, screenPos, visible });
+            tmpIBone.push_back({
+                originalData[i].Pos,  // Location
+                originalData[i].Scale,  // Scale
+                IData[i].Rotation  // Rotation
             });
-    }
+        }
+
+        // If we projected only a single/incorrect point, ESP boxes can grow along the LOS line.
+        // Pick the candidate that produces enough visible bones.
+        if (visibleCount < 3)
+            return false;
+
+        BonePosList.swap(tmpBonePos);
+        IBoneData.swap(tmpIBone);
+
+        return true;
+    };
+
+    // Try the configured offset and nearby adjustments.
+    const DWORD base = Offset.Pawn.BoneArray;
+    bool ok = tryReadCandidate(base) || tryReadCandidate(base - 0x80) || tryReadCandidate(base + 0x80);
+    if (!ok)
+        return false;
+
     return true;
 }
 
@@ -135,9 +159,12 @@ bool CBone::UpdateAllBoneDataBatch(const DWORD64& EntityPawnAddress) {
 		offset += sizeof(BoneJointData);
 
 		Vec2 ScreenPos;
-		bool IsVisible = false;
-		if (gGame.View.WorldToScreen(bone.Pos, ScreenPos))
-			IsVisible = true;
+			bool IsVisible = false;
+			if (gGame.View.WorldToScreen(bone.Pos, ScreenPos))
+				IsVisible = (ScreenPos.x >= 0.0f && ScreenPos.x <= Gui.Window.Size.x &&
+					ScreenPos.y >= 0.0f && ScreenPos.y <= Gui.Window.Size.y);
+			if (i == 27)
+				IsVisible = false;
 
 		// Original bone position data
 		this->BonePosList.push_back({ bone.Pos, ScreenPos, IsVisible });

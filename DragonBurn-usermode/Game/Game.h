@@ -23,6 +23,9 @@ private:
 		DWORD64 AttackBtn;
 		DWORD64 RightBtn;
 		DWORD64 LeftBtn;
+		DWORD64 ForwardBtn;
+		DWORD64 BackBtn;
+		DWORD64 DuckBtn;
 	}Address;
 
 public:
@@ -45,6 +48,9 @@ public:
 	DWORD64 GetAttackBtnAddress();
 	DWORD64 GetRightBtnAddress();
 	DWORD64 GetLeftBtnAddress();
+	DWORD64 GetForwardBtnAddress();
+	DWORD64 GetBackBtnAddress();
+	DWORD64 GetDuckBtnAddress();
 
 	bool UpdateEntityListEntry();
 };

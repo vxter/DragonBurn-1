@@ -20,8 +20,11 @@ static DWORD SafeGetDWORD(const json& obj, const std::vector<std::string>& keys,
             return defaultValue;
     }
 
-    if (current->is_number())
+    if (current->is_number_unsigned() || current->is_number_integer() || current->is_number_float())
         return current->get<DWORD>();
+
+    if (current->is_object() && current->contains("offset"))
+        return SafeGetDWORD(*current, { "offset" }, defaultValue);
 
     return defaultValue;
 }
@@ -47,6 +50,9 @@ void Offsets::SetOffsets(const std::string& offsetsData, const std::string& butt
     this->Buttons.Jump = SafeGetDWORD(buttonsJson, {"client.dll", "jump"});
     this->Buttons.Right = SafeGetDWORD(buttonsJson, {"client.dll", "right"});
     this->Buttons.Left = SafeGetDWORD(buttonsJson, {"client.dll", "left"});
+    this->Buttons.Forward = SafeGetDWORD(buttonsJson, {"client.dll", "forward"});
+    this->Buttons.Back = SafeGetDWORD(buttonsJson, {"client.dll", "back"});
+    this->Buttons.Duck = SafeGetDWORD(buttonsJson, {"client.dll", "duck"});
 
     this->Entity.IsAlive = SafeGetDWORD(client_dllJson, {"CCSPlayerController", "fields", "m_bPawnIsAlive"});
     this->Entity.PlayerPawn = SafeGetDWORD(client_dllJson, {"CCSPlayerController", "fields", "m_hPlayerPawn"});
@@ -78,6 +84,7 @@ void Offsets::SetOffsets(const std::string& offsetsData, const std::string& butt
     this->Pawn.AbsVelocity = SafeGetDWORD(client_dllJson, {"C_BaseEntity", "fields", "m_vecAbsVelocity"});
     this->Pawn.m_bWaitForNoAttack = SafeGetDWORD(client_dllJson, {"C_CSPlayerPawn", "fields", "m_bWaitForNoAttack"});
      this->Pawn.m_pWeaponServices = SafeGetDWORD(client_dllJson, {"C_BasePlayerPawn", "fields", "m_pWeaponServices"});
+     this->Pawn.m_pMovementServices = SafeGetDWORD(client_dllJson, {"C_BasePlayerPawn", "fields", "m_pMovementServices"});
      this->Pawn.m_flEmitSoundTime = SafeGetDWORD(client_dllJson, {"C_CSPlayerPawn", "fields", "m_flEmitSoundTime"});
  
      this->GlobalVar.RealTime = 0x00;

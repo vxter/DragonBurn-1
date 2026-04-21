@@ -8,8 +8,9 @@ void TriggerBot::Run(const CEntity& LocalEntity, const int& LocalPlayerControlle
     if (MenuConfig::ShowMenu)
         return;
 
-    if (LocalEntity.Controller.AliveStatus == 0)
-        return;
+	// Don't rely on AliveStatus alone; after offset/overlay changes it can be stale.
+	if (LocalEntity.Pawn.Address == 0 || LocalEntity.Pawn.Health <= 0)
+		return;
 
     // Get the entity under the crosshair
     DWORD uHandle = 0;
@@ -82,10 +83,9 @@ bool TriggerBot::CanTrigger(const CEntity& LocalEntity, const CEntity& TargetEnt
     if (MenuConfig::TeamCheck && LocalEntity.Pawn.TeamID == TargetEntity.Pawn.TeamID)
         return false;
 
-    // Check if weapon is ready
-    bool waitForNoAttack = false;
-    if (!memoryManager.ReadMemory<bool>(LocalEntity.Pawn.Address + Offset.Pawn.m_bWaitForNoAttack, waitForNoAttack))
-        return false;
+	// Check if weapon is ready
+	bool waitForNoAttack = false;
+	memoryManager.ReadMemory<bool>(LocalEntity.Pawn.Address + Offset.Pawn.m_bWaitForNoAttack, waitForNoAttack);
 
     if (waitForNoAttack)
         return false;
@@ -103,20 +103,26 @@ bool TriggerBot::CanTrigger(const CEntity& LocalEntity, const CEntity& TargetEnt
     if (!IgnoreFlash && LocalEntity.Pawn.FlashDuration > 0.0f)
         return false;
 
-    // Check TTD timout
-    DWORD64 playerMask = (DWORD64(1) << LocalPlayerControllerIndex);
-    bool bIsVisible = (TargetEntity.Pawn.bSpottedByMask & playerMask) || (LocalEntity.Pawn.bSpottedByMask & playerMask);
-    if (TTDtimeout && !bIsVisible)
-        return false;
+	// Check TTD timout
+	DWORD64 playerMask = (DWORD64(1) << LocalPlayerControllerIndex);
+	bool bIsVisible = (TargetEntity.Pawn.bSpottedByMask & playerMask) || (LocalEntity.Pawn.bSpottedByMask & playerMask);
+	if (TTDtimeout && !bIsVisible)
+		return false;
+
+	// If spotted masks look uninitialized, don't block trigger.
+	if (VisibleCheck && TargetEntity.Pawn.bSpottedByMask == 0 && LocalEntity.Pawn.bSpottedByMask == 0)
+		return true;
 
     // Check scope requirement
-    if (ScopeOnly && CheckScopeWeapon(currentWeapon))
-    {
-        bool isScoped = false;
-        memoryManager.ReadMemory<bool>(LocalEntity.Pawn.Address + Offset.Pawn.isScoped, isScoped);
-        if (!isScoped)
-            return false;
-    }
+	if (ScopeOnly && CheckScopeWeapon(currentWeapon))
+	{
+		bool isScoped = false;
+		if (memoryManager.ReadMemory<bool>(LocalEntity.Pawn.Address + Offset.Pawn.isScoped, isScoped))
+		{
+			if (!isScoped)
+				return false;
+		}
+	}
 
     return true;
 }

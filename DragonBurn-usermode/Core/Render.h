@@ -21,6 +21,8 @@ namespace Render
 
 		const auto& BoneList = Entity.GetBone().BonePosList;
 		if (BoneList.empty()) return;
+		if (BONEINDEX::head >= BoneList.size() || BONEINDEX::neck_0 >= BoneList.size())
+			return;
 
 		const BoneJointPos& Head = BoneList[BONEINDEX::head];
 		const BoneJointPos& Neck = BoneList[BONEINDEX::neck_0];
@@ -179,6 +181,8 @@ namespace Render
 		const auto& bonePosList = Entity.GetBone().BonePosList;
 		if (bonePosList.empty())
 			return ImVec4(0, 0, 0, 0);
+		if (BONEINDEX::head >= bonePosList.size() || BONEINDEX::pelvis >= bonePosList.size())
+			return ImVec4(0, 0, 0, 0);
 
 		Vec2 minPos = bonePosList[0].ScreenPos;
 		Vec2 maxPos = bonePosList[0].ScreenPos;
@@ -216,6 +220,10 @@ namespace Render
 			return;
 
 		const auto& bonePosList = Entity.GetBone().BonePosList;
+		if (bonePosList.empty())
+			return;
+		// Hardcoded indices can be larger than bonePosList.size() when bone reads fail.
+		const size_t boneCount = bonePosList.size();
 		BoneJointPos previous, current;
 
 		for (const auto& boneChain : BoneJointList::List)
@@ -223,6 +231,8 @@ namespace Render
 			previous.Pos = Vec3(0, 0, 0);
 			for (const auto& index : boneChain)
 			{
+				if (index >= boneCount)
+					continue;
 				current = bonePosList[index];
 				if (previous.Pos == Vec3(0, 0, 0))
 				{
@@ -236,6 +246,8 @@ namespace Render
 				previous = current;
 			}
 		}
+
+
 	}
 
 	inline void ShowLosLine(const CEntity& Entity, const float Length, ImColor Color, float Thickness)
@@ -244,6 +256,8 @@ namespace Render
 			return;
 
 		const auto& bonePosList = Entity.GetBone().BonePosList;
+		if (bonePosList.empty() || BONEINDEX::head >= bonePosList.size())
+			return;
 		const BoneJointPos& head = bonePosList[BONEINDEX::head];
 		const Vec2 startPoint = head.ScreenPos;
 

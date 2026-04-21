@@ -56,20 +56,15 @@ bool CEntity::UpdateController(const DWORD64& PlayerControllerAddress)
 		return false;
 	this->Controller.Address = PlayerControllerAddress;
 
-	if (!this->Controller.GetHealth())
-		return false;
-	if (!this->Controller.GetIsAlive())
-		return false;
-	if (!this->Controller.GetTeamID())
-		return false;
-	if (!this->Controller.GetPlayerName())
-		return false;
-	if (!this->Controller.GetPlayerSteamID())
-		return false;
+	// Best-effort reads. Avoid blocking overlay UI.
+	this->Controller.GetHealth();
+	this->Controller.GetIsAlive();
+	this->Controller.GetTeamID();
+	this->Controller.GetPlayerName();
+	this->Controller.GetPlayerSteamID();
 
 	this->Pawn.Address = this->Controller.GetPlayerPawnAddress();
-
-	return true;
+	return this->Pawn.Address != 0;
 }
 
 bool CEntity::UpdatePawn(const DWORD64& PlayerPawnAddress)
@@ -84,38 +79,24 @@ bool CEntity::UpdatePawn(const DWORD64& PlayerPawnAddress)
 		return false;
 	if (!this->Pawn.GetViewAngle())//
 		return false;
-	if (!this->Pawn.GetWeaponName())//
-		return false;
-	if (!this->Pawn.GetAimPunchAngle())//
-		return false;
-	if (!this->Pawn.GetShotsFired())//
-		return false;
-	if (!this->Pawn.GetHealth())//
-		return false;
-	if (!this->Pawn.GetAmmo())//
-		return false;
+	this->Pawn.GetWeaponName();
+	this->Pawn.GetAimPunchAngle();
+	this->Pawn.GetShotsFired();
+	this->Pawn.GetHealth();
+	this->Pawn.GetAmmo();
 	//if (!this->Pawn.GetMaxAmmo())
 	//	return false;
-	if (!this->Pawn.GetArmor())//
-		return false;
-	if (!this->Pawn.GetTeamID())//
-		return false;
-	if (!this->Pawn.GetFov())
-		return false;
-	if (!this->Pawn.GetSpotted())//
-		return false;
-	if (!this->Pawn.GetFFlags())
-		return false;
+	this->Pawn.GetArmor();
+	this->Pawn.GetTeamID();
+	this->Pawn.GetFov();
+	this->Pawn.GetSpotted();
+	this->Pawn.GetFFlags();
 	//if (!this->Pawn.GetDefusing())
 	//	return false;
-	if (!this->Pawn.GetFlashDuration())//
-		return false;
-	if (!this->Pawn.GetVelocity())
-		return false;
-	if (!this->Pawn.GetAimPunchCache())//
-		return false;
-	if (!this->Pawn.BoneData.UpdateAllBoneData(PlayerPawnAddress))//
-		return false;
+	this->Pawn.GetFlashDuration();
+	this->Pawn.GetVelocity();
+	this->Pawn.GetAimPunchCache();
+	this->Pawn.BoneData.UpdateAllBoneData(PlayerPawnAddress);
 
 	return true;
 }

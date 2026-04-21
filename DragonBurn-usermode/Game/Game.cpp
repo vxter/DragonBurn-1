@@ -16,6 +16,9 @@ bool CGame::InitAddress()
 	this->Address.AttackBtn = GetClientDLLAddress() + Offset.Buttons.Attack;
 	this->Address.RightBtn = GetClientDLLAddress() + Offset.Buttons.Right;
 	this->Address.LeftBtn = GetClientDLLAddress() + Offset.Buttons.Left;
+	this->Address.ForwardBtn = GetClientDLLAddress() + Offset.Buttons.Forward;
+	this->Address.BackBtn = GetClientDLLAddress() + Offset.Buttons.Back;
+	this->Address.DuckBtn = GetClientDLLAddress() + Offset.Buttons.Duck;
 
 	return this->Address.ClientDLL != 0;
 }
@@ -88,6 +91,21 @@ DWORD64 CGame::GetRightBtnAddress()
 DWORD64 CGame::GetLeftBtnAddress()
 {
 	return this->Address.LeftBtn;
+}
+
+DWORD64 CGame::GetForwardBtnAddress()
+{
+	return this->Address.ForwardBtn;
+}
+
+DWORD64 CGame::GetBackBtnAddress()
+{
+	return this->Address.BackBtn;
+}
+
+DWORD64 CGame::GetDuckBtnAddress()
+{
+	return this->Address.DuckBtn;
 }
 
 
