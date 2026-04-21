@@ -109,9 +109,10 @@ bool TriggerBot::CanTrigger(const CEntity& LocalEntity, const CEntity& TargetEnt
 	if (TTDtimeout && !bIsVisible)
 		return false;
 
-	// If spotted masks look uninitialized, don't block trigger.
+	// If spotted masks are uninitialized (both 0) while VisibleCheck is enabled,
+	// don't assume visibility. Treat as not visible.
 	if (VisibleCheck && TargetEntity.Pawn.bSpottedByMask == 0 && LocalEntity.Pawn.bSpottedByMask == 0)
-		return true;
+		return false;
 
     // Check scope requirement
 	if (ScopeOnly && CheckScopeWeapon(currentWeapon))

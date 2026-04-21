@@ -477,12 +477,9 @@ void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& loca
 				if (distanceToSight < minDistance && distanceToSight <= aimFovRadius) {
 					minDistance = distanceToSight;
 
-					bool maskUninitialized = LegitBotConfig::VisibleCheck &&
-						entity.Pawn.bSpottedByMask == 0 &&
-						localEntity.Pawn.bSpottedByMask == 0;
-					if (!LegitBotConfig::VisibleCheck || maskUninitialized ||
-						entity.Pawn.bSpottedByMask & (DWORD64(1) << (localPlayerControllerIndex)) ||
-						localEntity.Pawn.bSpottedByMask & (DWORD64(1) << (entityIndex))) {
+					if (!LegitBotConfig::VisibleCheck ||
+						(entity.Pawn.bSpottedByMask & (DWORD64(1) << (localPlayerControllerIndex))) ||
+						(localEntity.Pawn.bSpottedByMask & (DWORD64(1) << (entityIndex)))) {
 						Vec3 tempPos = bonePosList[hitboxID].Pos;
 						if (!std::isfinite(tempPos.x) || !std::isfinite(tempPos.y) || !std::isfinite(tempPos.z))
 							continue;

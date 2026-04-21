@@ -69,8 +69,13 @@ namespace GUI
 
 	inline void InitHitboxList()
 	{
-		if (LegitBotConfig::HitboxUpdated)
-			return;
+		// Always sync checkbox states with current HitboxList.
+		// Otherwise stale checkbox booleans can leave unintended bones in AimControl::HitboxList.
+		checkbox1 = false;
+		checkbox2 = false;
+		checkbox3 = false;
+		checkbox4 = false;
+		checkbox5 = false;
 		auto HitboxList = AimControl::HitboxList;
 
 		auto it = std::find(HitboxList.begin(), HitboxList.end(), BONEINDEX::head);
@@ -95,19 +100,20 @@ namespace GUI
 
 		LegitBotConfig::HitboxUpdated = true;
 	}
-	void addHitbox(int BoneIndex)
-	{
-		AimControl::HitboxList.push_back(BoneIndex);
-	}
-	void removeHitbox(int BoneIndex)
-	{
-		for (auto it = AimControl::HitboxList.begin(); it != AimControl::HitboxList.end(); ++it) {
-			if (*it == BoneIndex) {
-				AimControl::HitboxList.erase(it);
-				break;
+		void addHitbox(int BoneIndex)
+		{
+			if (std::find(AimControl::HitboxList.begin(), AimControl::HitboxList.end(), BoneIndex) == AimControl::HitboxList.end())
+				AimControl::HitboxList.push_back(BoneIndex);
+		}
+		void removeHitbox(int BoneIndex)
+		{
+			for (auto it = AimControl::HitboxList.begin(); it != AimControl::HitboxList.end(); ) {
+				if (*it == BoneIndex)
+					it = AimControl::HitboxList.erase(it);
+				else
+					++it;
 			}
 		}
-	}
 
 	void LoadImages()
 	{
@@ -563,7 +569,7 @@ namespace GUI
 						ImGui::SetCursorScreenPos(ImVec2(StartPos.x + 193, StartPos.y + 139));
 						if (ImGui::Checkbox("###Pelvis", &checkbox5))
 						{
-							if (checkbox4) {
+							if (checkbox5) {
 								addHitbox(BONEINDEX::pelvis);
 							}
 							else {
