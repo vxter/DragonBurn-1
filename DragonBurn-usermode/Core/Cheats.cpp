@@ -16,9 +16,15 @@
 #include <iostream>
 #include <cstdio>
 #include <cmath>
+#include <cfloat>
+#include <algorithm>
+#include <array>
+#include <limits>
+#include <utility>
 
 #include "Cheats.h"
 #include "Render.h"
+#include "../Game/Bone.h"  // for BONEINDEX enum
 #include "../Core/Config.h"
 
 #include "../Core/Init.h"
@@ -38,7 +44,7 @@ void Menu();
 void Visual(const CEntity&);
 void Radar(Base_Radar, const CEntity&);
 void Trigger(const CEntity&, const int&);
-void AIM(const CEntity&, std::vector<Vec3>&);
+void AIM(const CEntity&, std::vector<AimControl::AimPoint>&);
 void MiscFuncs(CEntity&);
 void RenderCrosshair(ImDrawList*, const CEntity&);
 void RadarSetting(Base_Radar&);
@@ -101,7 +107,7 @@ void Cheats::Run()
 		m_currentTick = 0;
 
 	// aimbot data
-	std::vector<Vec3> AimPosList;
+	std::vector<AimControl::AimPoint> AimPosList;
 
 	// radar data
 	Base_Radar GameRadar;
@@ -124,6 +130,10 @@ void Cheats::Run()
 	}
 	MiscFuncs(LocalEntity);
 
+	// Run RCS recorder continuously during calibration (not tick-gated).
+	if (canProcessEntities && LegitBotConfig::RCS && (RCS::CalibrationRecording || RCS::PendingStartCalibration || RCS::PendingStopAndSave || RCS::PendingDiscard))
+		RCS::RecoilControl(LocalEntity);
+
 	int currentFPS = static_cast<int>(ImGui::GetIO().Framerate);
 	if (currentFPS > MenuConfig::RenderFPS)
 	{
@@ -140,6 +150,8 @@ void Cheats::Run()
 	const bool canAimNow = canProcessEntities && !AimPosList.empty();
 	const bool tickChanged = (m_currentTick != m_previousTick);
 	const bool tickStuck = (m_currentTick == 0 && m_previousTick == 0);
+	static ULONGLONG lastSpecUpdate = 0;
+	const ULONGLONG nowTickMs = GetTickCount64();
 
 	if (tickChanged || (tickStuck && canAimNow))
 	{
@@ -148,14 +160,7 @@ void Cheats::Run()
 			AIM(LocalEntity, AimPosList);
 		}
 		
-		if (canProcessEntities)
-		{
-			std::vector<CEntity> allEntities;
-			for (const auto& pair : cachedResults) {
-				allEntities.push_back(pair.second);
-			}
-			SpecList::GetSpectatorList(allEntities, LocalEntity);
-		}
+
 		
 		// Update web radar
 		if (WebRadarCFG::Enabled && WebRadar::g_webRadar && WebRadar::g_webRadar->IsEnabled())
@@ -306,6 +311,18 @@ void Cheats::Run()
 		
 		m_previousTick = m_currentTick;
 	}
+
+	// Spectator list: update at a time interval (not server-tick gated).
+	if (canProcessEntities && MiscCFG::SpecList && (nowTickMs - lastSpecUpdate >= 250))
+	{
+		std::vector<CEntity> allEntities;
+		allEntities.reserve(cachedResults.size());
+		for (const auto& pair : cachedResults) {
+			allEntities.push_back(pair.second);
+		}
+		SpecList::GetSpectatorList(allEntities, LocalEntity);
+		lastSpecUpdate = nowTickMs;
+	}
 }
 
 // collect entity data
@@ -410,14 +427,39 @@ std::vector<EntityResult> Cheats::ProcessEntities(CEntity& localEntity, int& loc
 }
 
 // render, collect aim data
-void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& localEntity, 
-	int localPlayerControllerIndex, Base_Radar& gameRadar, std::vector<Vec3>& aimPosList)
+void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& localEntity,
+    int localPlayerControllerIndex, Base_Radar& gameRadar, std::vector<AimControl::AimPoint>& aimPosList)
 {
 	// healthbar map (static)
 	static std::map<DWORD64, Render::HealthBar> HealthBarMap;
 
 	// aimbot data
 	float MaxAimDistance = 100000;
+	AimControl::ClearDebugSamples();
+
+	const auto indexToMask = [](int idx) -> DWORD64 {
+		if (idx < 0 || idx >= 64)
+			return 0ull;
+		return DWORD64(1) << idx;
+	};
+	const DWORD64 localMask = indexToMask(localPlayerControllerIndex);
+
+	constexpr float DEG_TO_RAD = M_PI / 180.f;
+	const Vec2 screenCenter{ Gui.Window.Size.x / 2.f, Gui.Window.Size.y / 2.f };
+	float referenceFov = static_cast<float>(localEntity.Pawn.Fov);
+	if (!std::isfinite(referenceFov) || referenceFov < 1.f || referenceFov > 179.f)
+		referenceFov = 90.f;
+	const float referenceTan = tanf(referenceFov * DEG_TO_RAD / 2.f);
+	const float radiusScale = std::min(Gui.Window.Size.x, Gui.Window.Size.y) / 2.f;
+	const bool enforceAimFov = AimControl::AimFov > 0.01f && referenceTan > 0.f;
+	float aimFovRadius = std::numeric_limits<float>::infinity();
+	if (enforceAimFov)
+	{
+		float aimFovDeg = std::clamp(AimControl::AimFov, 0.1f, 179.f);
+		float aimTan = tanf(aimFovDeg * DEG_TO_RAD / 2.f);
+		aimFovRadius = (aimTan / referenceTan) * radiusScale;
+	}
+	const float aimFovRadiusSq = aimFovRadius * aimFovRadius;
 
 	for (const auto& result : entities)
 	{
@@ -431,6 +473,8 @@ void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& loca
 		const auto& entity = result.entity;
 		const int entityIndex = result.entityIndex;
 
+		const DWORD64 entityMask = indexToMask(entityIndex);
+
 		// add entity to radar
 		if (RadarCFG::ShowRadar && localEntity.Controller.TeamID != 0)
 		{
@@ -443,56 +487,190 @@ void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& loca
 			ESP::RenderOutOfFOVArrow(localEntity, result.entity);
 		}
 
-        // skip not in screen
-		if (!result.isInScreen)
-		{
-			continue;
-		}
-
-		// process aimbot data
-		if (!AimControl::HitboxList.empty()) {
-			float minDistance = FLT_MAX;
-			Vec3 bestAimPos = { 0, 0, 0 };
-
-			ImVec2 screenCenter{ Gui.Window.Size.x / 2, Gui.Window.Size.y / 2 };
-
-			constexpr float DEG_TO_RAD = M_PI / 180.f;
-			constexpr float STATIC_FOV = 90.0f;
-			float halfWindowSize = Gui.Window.Size.x / 2.f;
-			float staticFovTan = tan(STATIC_FOV * DEG_TO_RAD / 2.f);
-			float aimFovTan = tan(AimControl::AimFov * DEG_TO_RAD / 2.f);
-			float aimFovRadius = (aimFovTan / staticFovTan) * halfWindowSize;
-
-			const auto& bonePosList = entity.GetBone().BonePosList;
-			if (bonePosList.empty())
-				continue;
-			for (size_t i = 0; i < AimControl::HitboxList.size(); ++i) {
-				int hitboxID = AimControl::HitboxList[i];
-				if (hitboxID < 0 || static_cast<size_t>(hitboxID) >= bonePosList.size())
+			// process aimbot data: respect configured hitbox ordering and FOV
+			if (!AimControl::HitboxList.empty()) {
+				const auto& bonePosList = entity.GetBone().BonePosList;
+				if (bonePosList.empty())
 					continue;
+				Vec3 bboxMin{ FLT_MAX, FLT_MAX, FLT_MAX };
+				Vec3 bboxMax{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
+				bool hasBbox = false;
+				for (const auto& bp : bonePosList) {
+					const Vec3& bpPos = bp.Pos;
+					if (!std::isfinite(bpPos.x) || !std::isfinite(bpPos.y) || !std::isfinite(bpPos.z))
+						continue;
+					hasBbox = true;
+					bboxMin.x = std::min(bboxMin.x, bpPos.x);
+					bboxMin.y = std::min(bboxMin.y, bpPos.y);
+					bboxMin.z = std::min(bboxMin.z, bpPos.z);
+					bboxMax.x = std::max(bboxMax.x, bpPos.x);
+					bboxMax.y = std::max(bboxMax.y, bpPos.y);
+					bboxMax.z = std::max(bboxMax.z, bpPos.z);
+				}
+				Vec3 bboxCorners[8]{};
+				if (hasBbox) {
+					bboxCorners[0] = { bboxMin.x, bboxMin.y, bboxMin.z };
+					bboxCorners[1] = { bboxMin.x, bboxMin.y, bboxMax.z };
+					bboxCorners[2] = { bboxMin.x, bboxMax.y, bboxMin.z };
+					bboxCorners[3] = { bboxMin.x, bboxMax.y, bboxMax.z };
+					bboxCorners[4] = { bboxMax.x, bboxMin.y, bboxMin.z };
+					bboxCorners[5] = { bboxMax.x, bboxMin.y, bboxMax.z };
+					bboxCorners[6] = { bboxMax.x, bboxMax.y, bboxMin.z };
+					bboxCorners[7] = { bboxMax.x, bboxMax.y, bboxMax.z };
+				}
 
-				float distanceToSight = bonePosList[hitboxID].ScreenPos.DistanceTo(
-					{ screenCenter.x, screenCenter.y });
+				const bool passesVisibility = (!LegitBotConfig::VisibleCheck) ||
+					((entity.Pawn.bSpottedByMask & localMask) != 0) ||
+					((localEntity.Pawn.bSpottedByMask & entityMask) != 0);
+				auto boneDamageScore = [](int boneId) -> int {
+					switch (boneId)
+					{
+					case BONEINDEX::head: return 100;
+					case BONEINDEX::neck_0: return 95;
+					case BONEINDEX::spine_3: return 85;
+					case BONEINDEX::spine_2: return 80;
+					case BONEINDEX::spine_1: return 78;
+					case BONEINDEX::spine_0: return 76;
+					case BONEINDEX::pelvis: return 82;
+					default: return 70;
+					}
+				};
+				auto tryPushCandidate = [&](const Vec3& candidate, AimControl::AimSampleKind kind, int damageScore, int boneIndex = -1) -> bool {
+					if (!std::isfinite(candidate.x) || !std::isfinite(candidate.y) || !std::isfinite(candidate.z))
+						return false;
+					Vec2 projected;
+					if (!gGame.View.WorldToScreen(candidate, projected))
+						return false;
+					const float dx = projected.x - screenCenter.x;
+					const float dy = projected.y - screenCenter.y;
+					const float distSq = dx * dx + dy * dy;
+					const bool insideFov = distSq <= aimFovRadiusSq;
+					const bool accepted = passesVisibility && (!enforceAimFov || insideFov);
+					AimControl::AddDebugSample(candidate, projected, kind, insideFov, passesVisibility, accepted);
+					if (!accepted)
+						return false;
+					AimControl::AimPoint point;
+					point.WorldPos = candidate;
+					point.DamageScore = damageScore;
+					point.Kind = kind;
+					point.BoneIndex = boneIndex;
+					aimPosList.push_back(point);
+					return true;
+				};
 
-				if (distanceToSight < minDistance && distanceToSight <= aimFovRadius) {
-					minDistance = distanceToSight;
-
-					if (!LegitBotConfig::VisibleCheck ||
-						(entity.Pawn.bSpottedByMask & (DWORD64(1) << (localPlayerControllerIndex))) ||
-						(localEntity.Pawn.bSpottedByMask & (DWORD64(1) << (entityIndex)))) {
-						Vec3 tempPos = bonePosList[hitboxID].Pos;
-						if (!std::isfinite(tempPos.x) || !std::isfinite(tempPos.y) || !std::isfinite(tempPos.z))
-							continue;
-
-						bestAimPos = tempPos;
-						aimPosList.push_back(bestAimPos);
-						MaxAimDistance = distanceToSight;
+				bool hasPrimary = false;
+				for (int hb : AimControl::HitboxList) {
+					if (hb < 0 || static_cast<size_t>(hb) >= bonePosList.size())
+						continue;
+					const Vec3 tempPos = bonePosList[hb].Pos;
+					if (tryPushCandidate(tempPos, AimControl::AimSampleKind::Bone, boneDamageScore(hb), hb)) {
+						hasPrimary = true;
 					}
 				}
-			}
-		}
+
+				Vec3 bboxCenter{
+					(bboxMin.x + bboxMax.x) * 0.5f,
+					(bboxMin.y + bboxMax.y) * 0.5f,
+					(bboxMin.z + bboxMax.z) * 0.5f
+				};
+				const float height = bboxMax.z - bboxMin.z;
+				if (!hasPrimary && hasBbox && AimControl::UseEdgeSampling)
+				{
+					static constexpr std::array<float, 3> edgeFractions{ 0.25f, 0.5f, 0.75f };
+					for (float fraction : edgeFractions)
+					{
+						float z = bboxMin.z + height * fraction;
+						Vec3 candidates[4]{
+							{ bboxMin.x, bboxCenter.y, z },
+							{ bboxMax.x, bboxCenter.y, z },
+							{ bboxCenter.x, bboxMin.y, z },
+							{ bboxCenter.x, bboxMax.y, z }
+						};
+						for (const auto& edgePoint : candidates)
+						{
+							tryPushCandidate(edgePoint, AimControl::AimSampleKind::Edge, 65);
+						}
+					}
+				}
+
+				if (!hasPrimary && hasBbox) {
+					static constexpr std::array<float, 3> bodySamples{ 0.7f, 0.5f, 0.35f };
+					for (float fraction : bodySamples) {
+						Vec3 sample = bboxCenter;
+						sample.z = bboxMin.z + height * fraction;
+						if (tryPushCandidate(sample, AimControl::AimSampleKind::Body, 70)) {
+							break;
+						}
+					}
+				}
+
+				if (!hasPrimary && hasBbox) {
+					for (const auto& corner : bboxCorners) {
+						if (tryPushCandidate(corner, AimControl::AimSampleKind::Corner, 55)) {
+							break;
+						}
+					}
+				}
+
+				if (hasBbox && ESPConfig::ShowHitboxBBox) {
+                    static const int edges[12][2] = {
+                        {0,1},{0,2},{0,4},{1,3},{1,5},{2,3},
+                        {2,6},{3,7},{4,5},{4,6},{5,7},{6,7}
+                    };
+                    ImVec2 projected[8];
+                    bool cornerVisible[8] = {};
+                    for (int i = 0; i < 8; ++i) {
+                        Vec2 screen;
+                        if (gGame.View.WorldToScreen(bboxCorners[i], screen)) {
+                            projected[i] = ImVec2(screen.x, screen.y);
+                            cornerVisible[i] = true;
+                        }
+                    }
+                    auto drawList = ImGui::GetBackgroundDrawList();
+                    ImU32 bboxColor = ESPConfig::BoneColor;
+                    for (const auto& edge : edges) {
+                        if (cornerVisible[edge[0]] && cornerVisible[edge[1]]) {
+                            drawList->AddLine(projected[edge[0]], projected[edge[1]], bboxColor, 1.0f);
+                        }
+                    }
+
+                    static const std::pair<int, float> perimeterBones[] = {
+                        {BONEINDEX::head, 12.f},
+                        {BONEINDEX::neck_0, 9.f},
+                        {BONEINDEX::spine_3, 14.f},
+                        {BONEINDEX::spine_2, 18.f},
+                        {BONEINDEX::spine_1, 20.f},
+                        {BONEINDEX::pelvis, 18.f},
+                        {BONEINDEX::arm_upper_L, 10.f},
+                        {BONEINDEX::arm_lower_L, 8.f},
+                        {BONEINDEX::hand_L, 6.f},
+                        {BONEINDEX::arm_upper_R, 10.f},
+                        {BONEINDEX::arm_lower_R, 8.f},
+                        {BONEINDEX::hand_R, 6.f},
+                        {BONEINDEX::leg_upper_L, 10.f},
+                        {BONEINDEX::leg_lower_L, 8.f},
+                        {BONEINDEX::ankle_L, 7.f},
+                        {BONEINDEX::leg_upper_R, 10.f},
+                        {BONEINDEX::leg_lower_R, 8.f},
+                        {BONEINDEX::ankle_R, 7.f}
+                    };
+                    float screenScale = Gui.Window.Size.y / 1080.f;
+                    for (const auto& [boneId, radius] : perimeterBones) {
+                        if (boneId < 0 || static_cast<size_t>(boneId) >= bonePosList.size())
+                            continue;
+                        const auto& bp = bonePosList[boneId];
+                        if (!bp.IsVisible)
+                            continue;
+                        ImVec2 pos{ bp.ScreenPos.x, bp.ScreenPos.y };
+                        drawList->AddCircle(pos, radius * screenScale, bboxColor, 32, 1.2f);
+                    }
+                }
+            }
 
 		// render esp
+		if (!result.isInScreen)
+			continue;
+
 		if (ESPConfig::ESPenabled && (!ESPConfig::FlashCheck || localEntity.Pawn.FlashDuration < 0.1f))
 		{
 			const ImVec4& Rect = result.espRect;
@@ -522,22 +700,61 @@ void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& loca
 						entity.Pawn.Ammo, AmmoBarPos, AmmoBarSize);
 				}
 
-				// armor
-				// It is meaningless to render a empty bar
-				if ((ESPConfig::ArmorBar || ESPConfig::ShowArmorNum) && entity.Pawn.Armor > 0)
-				{
-					bool HasHelmet;
-					ImVec2 ArmorBarPos;
-					memoryManager.ReadMemory(entity.Controller.Address + Offset.PlayerController.HasHelmet, HasHelmet);
-					
-					if (ESPConfig::ShowHealthBar)
-						ArmorBarPos = { Rect.x - 10.f, Rect.y };
-					else
-						ArmorBarPos = { Rect.x - 6.f, Rect.y };
-					
-					ImVec2 ArmorBarSize = { 4.f, Rect.w };
-					Render::DrawArmorBar(entity.Controller.Address, 100, entity.Pawn.Armor, HasHelmet, ArmorBarPos, ArmorBarSize);
-				}
+                // armor
+                // It is meaningless to render an empty bar
+                if ((ESPConfig::ArmorBar || ESPConfig::ShowArmorNum) && entity.Pawn.Armor > 0)
+                {
+                    bool HasHelmet;
+                    ImVec2 ArmorBarPos;
+                    memoryManager.ReadMemory(entity.Controller.Address + Offset.PlayerController.HasHelmet, HasHelmet);
+                    if (ESPConfig::ShowHealthBar)
+                        ArmorBarPos = { Rect.x - 10.f, Rect.y };
+                    else
+                        ArmorBarPos = { Rect.x - 6.f, Rect.y };
+                    ImVec2 ArmorBarSize = { 4.f, Rect.w };
+                    Render::DrawArmorBar(entity.Controller.Address, 100, entity.Pawn.Armor, HasHelmet, ArmorBarPos, ArmorBarSize);
+                }
+
+                // display visible bone names/IDs
+                if (ESPConfig::ShowBoneESP && ESPConfig::ShowBoneLabels)
+                {
+                    auto drawList = ImGui::GetBackgroundDrawList();
+                    const auto& boneList = entity.GetBone().BonePosList;
+                    for (size_t bi = 0; bi < boneList.size(); ++bi)
+                    {
+                        const auto& bp = boneList[bi];
+                        if (!bp.IsVisible)
+                            continue;
+                        ImVec2 pos{ bp.ScreenPos.x, bp.ScreenPos.y };
+                        char buf[32];
+                        // show bone enum name and index
+                        const char* name = "unk";
+                        switch ((BONEINDEX)bi) {
+                        case pelvis:     name = "pelvis"; break;
+                        case spine_0:    name = "spine_0"; break;
+                        case spine_1:    name = "spine_1"; break;
+                        case spine_2:    name = "spine_2"; break;
+                        case spine_3:    name = "spine_3"; break;
+                        case neck_0:     name = "neck_0"; break;
+                        case head:       name = "head"; break;
+                        case arm_upper_L:name = "arm_upper_L"; break;
+                        case arm_lower_L:name = "arm_lower_L"; break;
+                        case hand_L:     name = "hand_L"; break;
+                        case arm_upper_R:name = "arm_upper_R"; break;
+                        case arm_lower_R:name = "arm_lower_R"; break;
+                        case hand_R:     name = "hand_R"; break;
+                        case leg_upper_L:name = "leg_upper_L"; break;
+                        case leg_lower_L:name = "leg_lower_L"; break;
+                        case ankle_L:    name = "ankle_L"; break;
+                        case leg_upper_R:name = "leg_upper_R"; break;
+                        case leg_lower_R:name = "leg_lower_R"; break;
+                        case ankle_R:    name = "ankle_R"; break;
+                        default: break;
+                        }
+                        std::snprintf(buf, sizeof(buf), "%s[%zu]", name, bi);
+                        drawList->AddText(pos, IM_COL32(255,255,255,200), buf);
+                    }
+                }
 			}
 		}
 	}
@@ -563,7 +780,51 @@ void Visual(const CEntity& LocalEntity)
 	// HeadShoot Line
 	Render::HeadShootLine(LocalEntity, MiscCFG::HeadShootLineColor);
 
-	RenderCrosshair(ImGui::GetBackgroundDrawList(), LocalEntity);
+    RenderCrosshair(ImGui::GetBackgroundDrawList(), LocalEntity);
+
+    // visualize current aim target and direction
+    auto drawList = ImGui::GetBackgroundDrawList();
+	if (AimControl::HasTarget) {
+		ImVec2 target{ AimControl::LastTargetScreenPos.x, AimControl::LastTargetScreenPos.y };
+		ImVec2 center{ Gui.Window.Size.x / 2, Gui.Window.Size.y / 2 };
+		drawList->AddLine(center, target, ImColor(237, 85, 106, 200), 1.5f);
+		// overlay current targeted bone at top
+	}
+
+	if (ESPConfig::ShowAimSamples && !AimControl::DebugSamples.empty())
+	{
+		auto sampleLabel = [](AimControl::AimSampleKind kind) -> const char*
+		{
+			switch (kind)
+			{
+			case AimControl::AimSampleKind::Bone: return "B";
+			case AimControl::AimSampleKind::Body: return "C";
+			case AimControl::AimSampleKind::Edge: return "E";
+			case AimControl::AimSampleKind::Corner: return "R";
+			default: return "?";
+			}
+		};
+		const bool drawLabels = AimControl::DebugSamples.size() <= 80;
+		for (const auto& sample : AimControl::DebugSamples)
+		{
+			ImColor color;
+			if (!sample.VisibilityOk)
+				color = ImColor(130, 130, 130, 200);
+			else if (sample.Accepted)
+				color = ImColor(72, 201, 127, 235);
+			else if (sample.InsideFov)
+				color = ImColor(255, 196, 0, 220);
+			else
+				color = ImColor(226, 99, 99, 220);
+			float radius = sample.Accepted ? 5.0f : 3.0f;
+			ImVec2 screen{ sample.ScreenPos.x, sample.ScreenPos.y };
+			drawList->AddCircleFilled(screen, radius, color, 0);
+			if (drawLabels)
+			{
+				drawList->AddText(ImVec2(screen.x + 5.0f, screen.y - 6.0f), IM_COL32(255, 255, 255, 220), sampleLabel(sample.Kind));
+			}
+		}
+	}
 }
 
 void Radar(Base_Radar Radar, const CEntity& LocalEntity)
@@ -587,7 +848,7 @@ void Trigger(const CEntity& LocalEntity, const int& LocalPlayerControllerIndex)
 	}
 }
 
-void AIM(const CEntity& LocalEntity, std::vector<Vec3>& AimPosList) {
+void AIM(const CEntity& LocalEntity, std::vector<AimControl::AimPoint>& AimPosList) {
 	static ULONGLONG lastTick = 0;
 	ULONGLONG currentTick = GetTickCount64();
 
@@ -595,9 +856,22 @@ void AIM(const CEntity& LocalEntity, std::vector<Vec3>& AimPosList) {
 		RCS::RecoilControl(LocalEntity);
 		return;
 	}
+	// Calibration recorder lives in RCS::RecoilControl().
+	// (Recorder tick is called from Cheats::Run() to avoid tick-gating.)
 
-	bool keyHeld = (GetAsyncKeyState(AimControl::HotKey) & 0x8000) != 0;
-	bool shouldAim = LegitBotConfig::AimAlways || keyHeld;
+    bool keyHeld = (GetAsyncKeyState(AimControl::HotKey) & 0x8000) != 0;
+    // Determine aiming mode: always-on when non-toggle, or toggle-based when enabled
+    bool shouldAim;
+    if (LegitBotConfig::AimToggleMode) {
+        if (keyHeld && currentTick - lastTick >= 200) {
+            AimControl::switchToggle();
+            lastTick = currentTick;
+        }
+        shouldAim = LegitBotConfig::AimAlways;
+    } else {
+        // non-toggle mode: only aim while hotkey is held
+        shouldAim = keyHeld;
+    }
 
 	// Camera position reads can drift; fall back to entity origin.
 	Vec3 localAimPos = LocalEntity.Pawn.CameraPos;
@@ -607,13 +881,8 @@ void AIM(const CEntity& LocalEntity, std::vector<Vec3>& AimPosList) {
 		localAimPos = LocalEntity.Pawn.Pos;
 	}
 
-	if (shouldAim && !AimPosList.empty())
-		AimControl::AimBot(LocalEntity, localAimPos, AimPosList);
-
-	if (LegitBotConfig::AimToggleMode && keyHeld && currentTick - lastTick >= 200) {
-		AimControl::switchToggle();
-		lastTick = currentTick;
-	}
+    if (shouldAim && !AimPosList.empty())
+        AimControl::AimBot(LocalEntity, localAimPos, AimPosList);
 }
 
 void MiscFuncs(CEntity& LocalEntity)

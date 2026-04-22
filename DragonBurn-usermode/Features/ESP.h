@@ -3,6 +3,7 @@
 #include "..\Core\Config.h"
 #include "..\Core\Cheats.h"
 #include "..\Helpers\GetWeaponIcon.h"
+#include <algorithm>
 
 namespace ESP
 {
@@ -423,7 +424,7 @@ namespace ESP
     // Utility: clamp a point to a padded screen rectangle
     ImVec2 ClampToBounds(const ImVec2& p, float minX, float minY, float maxX, float maxY)
     {
-        return ImVec2(min(max(p.x, minX), maxX), min(max(p.y, minY), maxY));
+        return ImVec2(std::clamp(p.x, minX, maxX), std::clamp(p.y, minY, maxY));
     }
 
     // Draw an equilateral triangle oriented by angle
@@ -463,7 +464,7 @@ namespace ESP
         // Interpret OutOfFOVRadiusFactor as percent (0..100) if > 1, else scale
         float radius = ESPConfig::OutOfFOVRadiusFactor;
         if (radius <= 1.0f) radius *= 100.0f;
-        radius = min(max(radius, 0.0f), 100.0f);
+        radius = std::clamp(radius, 0.0f, 100.0f);
         const float ring = screen.y / ((120.0f - radius)/3);
 
         // Radar-like rotation: angleRad = localYawRad - atan2(target.y - local.y, target.x - local.x)

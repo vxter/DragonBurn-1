@@ -30,6 +30,7 @@ namespace MyConfigSaver
         ConfigData["ESP"]["Hotkey"] =               ESPConfig::HotKey;
         ConfigData["ESP"]["Enable"]=                ESPConfig::ESPenabled;
         ConfigData["ESP"]["BoneESP"]=               ESPConfig::ShowBoneESP;
+        ConfigData["ESP"]["BoneLabels"]=            ESPConfig::ShowBoneLabels;
         ConfigData["ESP"]["BoxESP"]=                ESPConfig::ShowBoxESP;
         ConfigData["ESP"]["BoxType"]=               ESPConfig::BoxType;
         ConfigData["ESP"]["SnapLine"]=              ESPConfig::ShowLineToEnemy;
@@ -44,6 +45,8 @@ namespace MyConfigSaver
         ConfigData["ESP"]["HeadBox"]=               ESPConfig::ShowHeadBox;
         ConfigData["ESP"]["Preview"]=               ESPConfig::ShowPreview;
         ConfigData["ESP"]["VisCheck"]=              ESPConfig::VisibleCheck;
+        ConfigData["ESP"]["HitboxBBox"]=           ESPConfig::ShowHitboxBBox;
+        ConfigData["ESP"]["AimSamples"]=           ESPConfig::ShowAimSamples;
         ConfigData["ESP"]["FilledBox"]=             ESPConfig::FilledBox;
         ConfigData["ESP"]["FilledVisBox"]=          ESPConfig::FilledVisBox;
         ConfigData["ESP"]["MultiColor"]=            ESPConfig::MultiColor;
@@ -176,6 +179,7 @@ namespace MyConfigSaver
         ConfigData["Aimbot"]["HumanizeVar"]=      AimControl::HumanizeVar;
         ConfigData["Aimbot"]["ScopeOnly"]=        AimControl::ScopeOnly;
         ConfigData["Aimbot"]["OnlyAuto"] =        AimControl::onlyAuto;
+        ConfigData["Aimbot"]["EdgeSampling"] =    AimControl::UseEdgeSampling;
 
         ConfigData["Aimbot"]["CircleColor"]["r"]= LegitBotConfig::FovCircleColor.Value.x;
         ConfigData["Aimbot"]["CircleColor"]["g"]= LegitBotConfig::FovCircleColor.Value.y;
@@ -277,6 +281,7 @@ namespace MyConfigSaver
             ESPConfig::HotKey = ReadData(ConfigData["ESP"], { "Hotkey" }, VK_F6);
             ESPConfig::ESPenabled = ReadData(ConfigData["ESP"], { "Enable" }, false);
             ESPConfig::ShowBoneESP = ReadData(ConfigData["ESP"], { "BoneESP" }, false);
+            ESPConfig::ShowBoneLabels = ReadData(ConfigData["ESP"], { "BoneLabels" }, false);
             ESPConfig::ShowBoxESP = ReadData(ConfigData["ESP"],{"BoxESP"}, false);
             ESPConfig::BoxType = ReadData(ConfigData["ESP"], { "BoxType" }, 0);
             ESPConfig::ShowLineToEnemy = ReadData(ConfigData["ESP"], { "SnapLine" }, false);
@@ -291,6 +296,8 @@ namespace MyConfigSaver
             ESPConfig::ShowHeadBox = ReadData(ConfigData["ESP"], { "HeadBox" }, false);
             ESPConfig::ShowPreview = ReadData(ConfigData["ESP"], { "Preview" }, false);
             ESPConfig::VisibleCheck = ReadData(ConfigData["ESP"], { "VisCheck" }, false);
+            ESPConfig::ShowHitboxBBox = ReadData(ConfigData["ESP"], { "HitboxBBox" }, false);
+            ESPConfig::ShowAimSamples = ReadData(ConfigData["ESP"], { "AimSamples" }, false);
             ESPConfig::FilledBox = ReadData(ConfigData["ESP"], { "FilledBox" }, false);
             ESPConfig::FilledVisBox = ReadData(ConfigData["ESP"], { "FilledVisBox" }, false);
             ESPConfig::MultiColor = ReadData(ConfigData["ESP"], { "MultiColor" }, false);
@@ -431,7 +438,8 @@ namespace MyConfigSaver
             AimControl::IgnoreFlash = ReadData(ConfigData["Aimbot"],{"IgnoreFlash"}, false);
             AimControl::HumanizeVar = ReadData(ConfigData["Aimbot"],{"HumanizeVar"}, true);
             AimControl::ScopeOnly = ReadData(ConfigData["Aimbot"],{"ScopeOnly"}, false);
-            AimControl::onlyAuto = ReadData(ConfigData["Aimbot"], { "OnlyAuto" }, false);
+        AimControl::onlyAuto = ReadData(ConfigData["Aimbot"], { "OnlyAuto" }, false);
+        AimControl::UseEdgeSampling = ReadData(ConfigData["Aimbot"], { "EdgeSampling" }, true);
             Text::Aimbot::HotKey = KeyMgr::GetKeyName(AimControl::HotKey);
             LegitBotConfig::HitboxUpdated = false;
         }

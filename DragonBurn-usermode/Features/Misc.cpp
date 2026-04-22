@@ -4,8 +4,11 @@
 #include <Shellapi.h>
 #include <filesystem>
 #include <random>
+#include <algorithm>
 #include "../Helpers/Logger.h"
 #include "../Core/Cheats.h"
+#undef min
+#undef max
 namespace fs = std::filesystem;
 
 namespace System {
@@ -479,10 +482,10 @@ namespace Misc
 				int roiH = static_cast<int>(wndH * 0.6f);
 				int wndCX = wndRect.left + wndW / 2;
 				int wndCY = wndRect.top + wndH / 2;
-				roiLeft = max(0, wndCX - roiW / 2 - vx);
-				roiTop = max(0, wndCY - roiH / 2 - vy);
-				roiRight = min(screenWidth, roiLeft + roiW);
-				roiBottom = min(screenHeight, roiTop + roiH);
+				roiLeft = std::max(0, wndCX - roiW / 2 - vx);
+				roiTop = std::max(0, wndCY - roiH / 2 - vy);
+				roiRight = std::min(screenWidth, roiLeft + roiW);
+				roiBottom = std::min(screenHeight, roiTop + roiH);
 			}
 			else
 			{

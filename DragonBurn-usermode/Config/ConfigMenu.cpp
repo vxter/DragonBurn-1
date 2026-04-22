@@ -158,6 +158,8 @@ namespace ConfigMenu {
 
 		ESPConfig::VisibleColor = ImColor(59, 71, 148, 180);
 		ESPConfig::VisibleCheck = false;
+		ESPConfig::ShowHitboxBBox = false;
+		ESPConfig::ShowAimSamples = false;
 
 		MenuConfig::WindowStyle = 0;
 		ESPConfig::ShowPreview = true;
@@ -166,6 +168,7 @@ namespace ConfigMenu {
 
 		ESPConfig::ShowDistance = false;
 		ESPConfig::ShowBoneESP = true;
+		ESPConfig::ShowBoneLabels = false;
 		ESPConfig::HotKey = VK_F6;
 		ESPConfig::ShowBoxESP = true;
 		ESPConfig::ShowHealthBar = true;
@@ -241,6 +244,7 @@ namespace ConfigMenu {
 
 		RCS::RCSScale = ImVec2(1.4f, 1.4f);
 		AimControl::onlyAuto = false;
+		AimControl::UseEdgeSampling = true;
 		AimControl::ScopeOnly = true;
 		AimControl::AimBullet = 1;
 

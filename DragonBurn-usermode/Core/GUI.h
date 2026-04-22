@@ -14,6 +14,12 @@
 #include "../Helpers/KeyManager.h"
 #include "../Helpers/InputManager.h"
 
+#include <algorithm>
+
+// Windows headers may define min/max macros that break std::min/std::max.
+#undef min
+#undef max
+
 #include "../Features/ESP.h"
 
 ID3D11ShaderResourceView* Logo = NULL;
@@ -362,8 +368,11 @@ namespace GUI
 						if (ESPConfig::FilledBox)
 							PutSwitch(Text::ESP::MultiColor.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::MultiColor, true, "###MultiCol", reinterpret_cast<float*>(&ESPConfig::FilledColor2));
 						PutSwitch(Text::ESP::HeadBox.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowHeadBox, true, "###HeadBoxCol", reinterpret_cast<float*>(&ESPConfig::HeadBoxColor));
-						PutSwitch(Text::ESP::Skeleton.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowBoneESP, true, "###BoneCol", reinterpret_cast<float*>(&ESPConfig::BoneColor));
-						PutSwitch(Text::ESP::SnapLine.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowLineToEnemy, true, "###LineCol", reinterpret_cast<float*>(&ESPConfig::LineToEnemyColor));
+					PutSwitch(Text::ESP::Skeleton.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowBoneESP, true, "###BoneCol", reinterpret_cast<float*>(&ESPConfig::BoneColor));
+					PutSwitch(Text::ESP::BoneLabels.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowBoneLabels);
+					PutSwitch(Text::ESP::HitboxBBox.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowHitboxBBox);
+					PutSwitch(Text::ESP::AimSamples.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowAimSamples);
+					PutSwitch(Text::ESP::SnapLine.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowLineToEnemy, true, "###LineCol", reinterpret_cast<float*>(&ESPConfig::LineToEnemyColor));
 						if (ESPConfig::ShowLineToEnemy) 
 						{
 							ImGui::TextDisabled(Text::ESP::LinePosList.c_str());
@@ -504,8 +513,9 @@ namespace GUI
 						PutSwitch(Text::Aimbot::Toggle.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &LegitBotConfig::AimToggleMode, false, NULL, NULL, Text::Aimbot::OffTip.c_str());
 						PutSwitch(Text::Aimbot::DrawFov.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::DrawFov, true, "###FOVcol", reinterpret_cast<float*>(&LegitBotConfig::FovCircleColor));
 						PutSwitch(Text::Aimbot::VisCheck.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &LegitBotConfig::VisibleCheck, false, NULL, NULL, Text::Aimbot::OnTip.c_str());
-						PutSwitch(Text::Aimbot::OnlyAuto.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &AimControl::onlyAuto, false, NULL, NULL, Text::Aimbot::OnlyAutoTip.c_str());
-						PutSwitch(Text::Aimbot::IgnoreFlash.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &AimControl::IgnoreFlash, false, NULL, NULL, Text::Aimbot::OffTip.c_str());
+					PutSwitch(Text::Aimbot::OnlyAuto.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &AimControl::onlyAuto, false, NULL, NULL, Text::Aimbot::OnlyAutoTip.c_str());
+					PutSwitch(Text::Aimbot::EdgeSampling.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &AimControl::UseEdgeSampling, false, NULL, NULL, Text::Aimbot::EdgeSamplingTip.c_str());
+					PutSwitch(Text::Aimbot::IgnoreFlash.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &AimControl::IgnoreFlash, false, NULL, NULL, Text::Aimbot::OffTip.c_str());
 						PutSwitch(Text::Aimbot::ScopeOnly.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &AimControl::ScopeOnly);
 
 						PutSwitch(Text::Aimbot::HumanizeVar.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &AimControl::HumanizeVar, false, NULL, NULL, Text::Aimbot::OnTip.c_str());
@@ -583,20 +593,64 @@ namespace GUI
 					ImGui::GradientText("RCS");
 					static const float recoilMin = 0.f, recoilMax = 2.f;
 					static const int RCSBulletMin = 0, RCSBulletMax = 5;
-					PutSwitch(Text::RCS::Toggle.c_str(), 5.f, ImGui::GetFrameHeight() * 1.7, &LegitBotConfig::RCS);
-					if (LegitBotConfig::RCS)
-					{
-						PutSliderInt(Text::RCS::BulletSlider.c_str(), 5.f, &RCS::RCSBullet, &RCSBulletMin, &RCSBulletMax, "%d");
-						PutSliderFloat(Text::RCS::Yaw.c_str(), 5.f, &RCS::RCSScale.x, &recoilMin, &recoilMax, "%.2f");
-						PutSliderFloat(Text::RCS::Pitch.c_str(), 5.f, &RCS::RCSScale.y, &recoilMin, &recoilMax, "%.2f");
-						float scalex = (2.22 - RCS::RCSScale.x) *.5f;
-						float scaley = (2.12 - RCS::RCSScale.y) *.5f;//Simulate reasonable error values
-						ImVec2 BulletPos = ImGui::GetCursorScreenPos();
+						PutSwitch(Text::RCS::Toggle.c_str(), 5.f, ImGui::GetFrameHeight() * 1.7, &LegitBotConfig::RCS);
+						if (LegitBotConfig::RCS)
+						{
+							PutSliderInt(Text::RCS::BulletSlider.c_str(), 5.f, &RCS::RCSBullet, &RCSBulletMin, &RCSBulletMax, "%d");
+							PutSliderFloat(Text::RCS::Yaw.c_str(), 5.f, &RCS::RCSScale.x, &recoilMin, &recoilMax, "%.2f");
+							PutSliderFloat(Text::RCS::Pitch.c_str(), 5.f, &RCS::RCSScale.y, &recoilMin, &recoilMax, "%.2f");
 
-						// Example Preview
-						ImVec2 BulletPos0, BulletPos1, BulletPos2, BulletPos3, BulletPos4, BulletPos5, BulletPos6, BulletPos7, BulletPos8, BulletPos9, BulletPos10, BulletPos11, BulletPos12, BulletPos13, BulletPos14, BulletPos15;
-						BulletPos.y += 123 * scaley;
-						BulletPos0.x = BulletPos.x + 125; BulletPos0.y = BulletPos.y + 5;
+							ImGui::Spacing();
+							if (!RCS::CalibrationRecording && !RCS::CalibrationAutoRun)
+							{
+								if (ImGui::Button("Calibrate (full clip)"))
+									RCS::RequestStartCalibrationAuto();
+							}
+							else
+							{
+								ImGui::TextDisabled("Calibrating... (spray full mag, do not move mouse)");
+								if (ImGui::Button("Discard"))
+									RCS::RequestDiscard();
+							}
+							float scalex = (2.22 - RCS::RCSScale.x) *.5f;
+							float scaley = (2.12 - RCS::RCSScale.y) *.5f;//Simulate reasonable error values
+							ImVec2 BulletPos = ImGui::GetCursorScreenPos();
+
+							RCS::WeaponProfile previewProfile;
+							bool hasPreviewProfile = !RCS::CalibrationWeapon.empty() && RCS::GetProfileForWeapon(RCS::CalibrationWeapon, previewProfile) && !previewProfile.bullets.empty();
+							if (hasPreviewProfile)
+							{
+								int N = static_cast<int>(previewProfile.bullets.size());
+								if (N > 15) N = 15;
+								float maxAbsYaw = 0.0f;
+								float totalAbsPitch = 0.0f;
+								for (int i = 0; i < N; ++i)
+								{
+									const float yawAbs = std::fabs(previewProfile.bullets[i].y);
+									const float pitchAbs = std::fabs(previewProfile.bullets[i].x);
+									maxAbsYaw = (yawAbs > maxAbsYaw) ? yawAbs : maxAbsYaw;
+									totalAbsPitch += pitchAbs;
+								}
+								float pitchScale = (totalAbsPitch > 0.0f) ? (123.0f / totalAbsPitch) : 0.0f;
+								float accPitch = 0.0f;
+								for (int i = 0; i < N; ++i)
+								{
+									const float pitchAbs = std::fabs(previewProfile.bullets[i].x);
+									accPitch += pitchAbs;
+									const float yawNorm = (maxAbsYaw > 0.0f) ? (previewProfile.bullets[i].y / maxAbsYaw) : 0.0f;
+									ImVec2 p;
+									p.x = BulletPos.x + 125.0f + yawNorm * (50.0f + 40.0f * scalex);
+									p.y = BulletPos.y + 5.0f - accPitch * pitchScale * (1.0f + scaley);
+									ImGui::GetWindowDrawList()->AddCircleFilled(p, 4.f, ImColor(ImGui::GetStyleColorVec4(ImGuiCol_Border)));
+								}
+							}
+							else
+							{
+
+							// Example Preview
+							ImVec2 BulletPos0, BulletPos1, BulletPos2, BulletPos3, BulletPos4, BulletPos5, BulletPos6, BulletPos7, BulletPos8, BulletPos9, BulletPos10, BulletPos11, BulletPos12, BulletPos13, BulletPos14, BulletPos15;
+							BulletPos.y += 123 * scaley;
+							BulletPos0.x = BulletPos.x + 125; BulletPos0.y = BulletPos.y + 5;
 						BulletPos1.x = BulletPos0.x - 3 * scalex; BulletPos1.y = BulletPos0.y - 5 * scaley;
 						BulletPos2.x = BulletPos1.x + 2 * scalex; BulletPos2.y = BulletPos1.y - 10 * scaley;
 						BulletPos3.x = BulletPos2.x + 4 * scalex; BulletPos3.y = BulletPos2.y - 11 * scaley;
@@ -626,10 +680,11 @@ namespace GUI
 						ImGui::GetWindowDrawList()->AddCircleFilled(BulletPos11, 4.f, ImColor(ImGui::GetStyleColorVec4(ImGuiCol_Border)));
 						ImGui::GetWindowDrawList()->AddCircleFilled(BulletPos12, 4.f, ImColor(ImGui::GetStyleColorVec4(ImGuiCol_Border)));
 						ImGui::GetWindowDrawList()->AddCircleFilled(BulletPos13, 4.f, ImColor(ImGui::GetStyleColorVec4(ImGuiCol_Border)));
-						ImGui::GetWindowDrawList()->AddCircleFilled(BulletPos14, 4.f, ImColor(ImGui::GetStyleColorVec4(ImGuiCol_Border)));
+								ImGui::GetWindowDrawList()->AddCircleFilled(BulletPos14, 4.f, ImColor(ImGui::GetStyleColorVec4(ImGuiCol_Border)));
+							}
 
-						ImGui::SetCursorScreenPos(ImVec2(BulletPos.x, BulletPos.y + 10));
-					}
+							ImGui::SetCursorScreenPos(ImVec2(BulletPos.x, BulletPos.y + 10));
+						}
 
 					ImGui::NewLine();
 					ImGui::GradientText("Triggerbot");

@@ -3,10 +3,27 @@
 #undef min()
 
 #include <cmath>
+#include <algorithm>
+#include <limits>
 
 void AimControl::switchToggle()
 {
     LegitBotConfig::AimAlways = !LegitBotConfig::AimAlways;
+}
+
+void AimControl::ClearDebugSamples()
+{
+    DebugSamples.clear();
+}
+
+void AimControl::AddDebugSample(const Vec3& worldPos, const Vec2& screenPos, AimSampleKind kind,
+    bool insideFov, bool visibilityOk, bool accepted)
+{
+    if (!ESPConfig::ShowAimSamples)
+        return;
+    if (DebugSamples.size() >= DebugSampleLimit)
+        return;
+    DebugSamples.push_back({ worldPos, screenPos, kind, insideFov, visibilityOk, accepted });
 }
 
 std::pair<float, float> AimControl::CalculateTargetOffset(const Vec2& ScreenPos, int ScreenCenterX, int ScreenCenterY)
@@ -62,7 +79,7 @@ std::pair<float, float> AimControl::Humanize(float TargetX, float TargetY) {
     return { SmoothedX + JitterX, SmoothedY + JitterY };
 }
 
-void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& AimPosList)
+void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos, std::vector<AimPoint>& AimPosList)
 {
     if (MenuConfig::ShowMenu)
         return;
@@ -101,7 +118,12 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
 			return;
 	}
 
-    const int ListSize = AimPosList.size();
+    if (AimControl::HitboxList.empty()) {
+        HasTarget = false;
+        return;
+    }
+
+    const int ListSize = static_cast<int>(AimPosList.size());
     if (ListSize == 0) {
         HasTarget = false;
         return;
@@ -121,18 +143,24 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
 
     float BestNorm = MAXV;
     int BestTargetIndex = -1;
+    int BestDamageScore = std::numeric_limits<int>::min();
     Vec2 Angles{ 0, 0 };
 	int invalidTargets = 0;
 	int invalidOpp = 0;
 	int invalidDistance = 0;
 	int invalidNorm = 0;
 
-    const int ScreenCenterX = Gui.Window.Size.x / 2;
-    const int ScreenCenterY = Gui.Window.Size.y / 2;
+	const int ScreenCenterX = Gui.Window.Size.x / 2;
+	const int ScreenCenterY = Gui.Window.Size.y / 2;
+	const bool enforceAimFov = AimControl::AimFov > 0.01f;
+	const float maxAimFov = enforceAimFov ? std::clamp(AimControl::AimFov, 0.1f, 179.f) : 0.f;
+	const float minAimFov = (enforceAimFov && AimControl::AimFovMin > 0.01f)
+		? std::min(AimControl::AimFovMin, maxAimFov)
+		: 0.f;
 
-    for (int i = 0; i < ListSize; i++)
-    {
-        Vec3 OppPos = AimPosList[i] - LocalPos;
+	for (int i = 0; i < ListSize; ++i)
+	{
+        Vec3 OppPos = AimPosList[i].WorldPos - LocalPos;
 		if (!std::isfinite(OppPos.x) || !std::isfinite(OppPos.y) || !std::isfinite(OppPos.z))
 		{
 			++invalidTargets;
@@ -140,39 +168,84 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
 			continue;
 		}
 
-		const float Distance = sqrt(OppPos.x * OppPos.x + OppPos.y * OppPos.y);
-		if (!std::isfinite(Distance))
-		{
-			++invalidTargets;
-			++invalidDistance;
-			continue;
-		}
-        if (LegitBotConfig::RCS)
+        const float DistanceRaw = sqrt(OppPos.x * OppPos.x + OppPos.y * OppPos.y);
+        if (!std::isfinite(DistanceRaw))
         {
-            RCS::UpdateAngles(Local, Angles);
+            ++invalidTargets;
+            ++invalidDistance;
+            continue;
+        }
 
-            /*x*/
-            const float radX = Angles.x * RCS::RCSScale.x / 360.f * M_PI;
-            const float sinX = sinf(radX);
-            const float cosX = cosf(radX);
+        // Close-range stability: avoid division by ~0 in recoil math.
+        // If we are almost aligned vertically (very small horizontal distance),
+        // recoil rotation becomes numerically unstable and can push the point
+        // behind the camera. In that case, skip recoil rotation for this candidate.
+        constexpr float DIST_EPS = 1e-3f;
+        const bool skipRcsRotation = DistanceRaw < DIST_EPS;
+        const float Distance = skipRcsRotation ? DIST_EPS : DistanceRaw;
+        if (!skipRcsRotation && LegitBotConfig::RCS && !RCS::IsCalibrating() && Local.Pawn.ShotsFired > static_cast<DWORD>(RCS::RCSBullet))
+        {
+            Vec2 profileAimPunch{ 0.f,0.f };
+            const bool hasProfile = RCS::GetProfileAimPunch(Local, profileAimPunch);
 
-            const float z = OppPos.z * cosX + Distance * sinX;
-            const float d = (Distance * cosX - OppPos.z * sinX) / Distance;
+            if (hasProfile)
+            {
+					// Profile is stored as aimPunchAngle per shot. Apply it directly (no generic RCS scaling).
+					Angles = profileAimPunch;
 
-            /*y*/
-            const float radY = -Angles.y * RCS::RCSScale.y / 360.f * M_PI;
-            const float sinY = sinf(radY);
-            const float cosY = cosf(radY);
+					// Match clamping/normalization behavior of RCS::UpdateAngles.
+					if (Angles.x > 89.f) Angles.x = 89.f;
+					if (Angles.x < -89.f) Angles.x = -89.f;
+					while (Angles.y > 180.f) Angles.y -= 360.f;
+					while (Angles.y < -180.f) Angles.y += 360.f;
 
-            const float x = (OppPos.x * cosY - OppPos.y * sinY) * d;
-            const float y = (OppPos.x * sinY + OppPos.y * cosY) * d;
+					/*x*/
+					const float radX = Angles.x * RCS::RCSScale.x / 360.f * M_PI;
+                const float sinX = sinf(radX);
+                const float cosX = cosf(radX);
 
-            OppPos = Vec3{ x, y, z };
-            AimPosList[i] = LocalPos + OppPos;
+                const float z = OppPos.z * cosX + Distance * sinX;
+                const float d = (Distance * cosX - OppPos.z * sinX) / Distance;
+
+					/*y*/
+					const float radY = -Angles.y * RCS::RCSScale.y / 360.f * M_PI;
+                const float sinY = sinf(radY);
+                const float cosY = cosf(radY);
+
+                const float x = (OppPos.x * cosY - OppPos.y * sinY) * d;
+                const float y = (OppPos.x * sinY + OppPos.y * cosY) * d;
+
+                OppPos = Vec3{ x, y, z };
+                AimPosList[i].WorldPos = LocalPos + OppPos;
+            }
+            else
+            {
+                RCS::UpdateAngles(Local, Angles);
+
+                /*x*/
+                const float radX = Angles.x * RCS::RCSScale.x / 360.f * M_PI;
+                const float sinX = sinf(radX);
+                const float cosX = cosf(radX);
+
+                const float z = OppPos.z * cosX + Distance * sinX;
+                const float d = (Distance * cosX - OppPos.z * sinX) / Distance;
+
+                /*y*/
+                const float radY = -Angles.y * RCS::RCSScale.y / 360.f * M_PI;
+                const float sinY = sinf(radY);
+                const float cosY = cosf(radY);
+
+                const float x = (OppPos.x * cosY - OppPos.y * sinY) * d;
+                const float y = (OppPos.x * sinY + OppPos.y * cosY) * d;
+
+                OppPos = Vec3{ x, y, z };
+                AimPosList[i].WorldPos = LocalPos + OppPos;
+            }
         }
 
         const float Yaw = atan2f(OppPos.y, OppPos.x) * 57.295779513f - Local.Pawn.ViewAngle.y;
-        const float Pitch = -atan(OppPos.z / Distance) * 57.295779513f - Local.Pawn.ViewAngle.x;
+        // Use atan2f to avoid divide-by-zero artifacts.
+        const float Pitch = -atan2f(OppPos.z, Distance) * 57.295779513f - Local.Pawn.ViewAngle.x;
         const float Norm = sqrt(Yaw * Yaw + Pitch * Pitch);
 		if (!std::isfinite(Norm))
 		{
@@ -180,30 +253,30 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
 			++invalidNorm;
 			continue;
 		}
+		if (enforceAimFov)
+		{
+			if (Norm > maxAimFov)
+				continue;
+			if (minAimFov > 0.f && Norm < minAimFov)
+				continue;
+		}
 
-        if (Norm < BestNorm) {
+        const int candidateDamage = AimPosList[i].DamageScore;
+        if (candidateDamage > BestDamageScore || (candidateDamage == BestDamageScore && Norm < BestNorm)) {
+            BestDamageScore = candidateDamage;
             BestNorm = Norm;
             BestTargetIndex = i;
         }
     }
 
-    if (BestNorm >= AimFov || BestNorm <= AimFovMin || BestTargetIndex == -1) {
+    // only abort if no valid target
+    if (BestTargetIndex == -1) {
         HasTarget = false;
-		if (GetTickCount64() - lastAimDbg > 3000)
-		{
-			lastAimDbg = GetTickCount64();
-			Vec3 sample = AimPosList.empty() ? Vec3{ 0,0,0 } : AimPosList[0];
-			std::printf("[AimDbg] abort fov: BestNorm=%.3f BestIndex=%d AimFov=%.3f AimFovMin=%.3f ListSize=%d invalid=%d (opp=%d dist=%d norm=%d) LocalPos=(%.3f,%.3f,%.3f) SampleTarget=(%.3f,%.3f,%.3f)\n",
-				BestNorm, BestTargetIndex, AimFov, AimFovMin, ListSize, invalidTargets,
-				invalidOpp, invalidDistance, invalidNorm,
-				LocalPos.x, LocalPos.y, LocalPos.z,
-				sample.x, sample.y, sample.z);
-		}
         return;
     }
 
     Vec2 ScreenPos;
-    if (!gGame.View.WorldToScreen(AimPosList[BestTargetIndex], ScreenPos)) {
+    if (!gGame.View.WorldToScreen(AimPosList[BestTargetIndex].WorldPos, ScreenPos)) {
         HasTarget = false;
 		if (GetTickCount64() - lastAimDbg > 3000)
 		{
@@ -214,18 +287,24 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
     }
 
     HasTarget = true;
+    // cache the selected positions for visualization
+    LastTargetWorldPos = AimPosList[BestTargetIndex].WorldPos;
+    LastTargetScreenPos = ScreenPos;
 
-    auto [TargetX, TargetY] = CalculateTargetOffset(ScreenPos, ScreenCenterX, ScreenCenterY);
+    auto [rawOffsetX, rawOffsetY] = CalculateTargetOffset(ScreenPos, ScreenCenterX, ScreenCenterY);
+    float TargetX = rawOffsetX;
+    float TargetY = rawOffsetY;
 
-    TargetX /= Local.Client.Sensitivity /4;
-    TargetY /= Local.Client.Sensitivity /4;
-    if (Smooth > 0.0f)
-    {
-        const float DistanceRatio = BestNorm / AimFov;
-        const float SpeedFactor = 1.0f + (1.0f - DistanceRatio);
-        TargetX /= (Smooth * SpeedFactor);
-        TargetY /= (Smooth * SpeedFactor);
-    }
+    TargetX /= Local.Client.Sensitivity / 4;
+    TargetY /= Local.Client.Sensitivity / 4;
+	const float smoothingReference = enforceAimFov ? maxAimFov : std::max(BestNorm, 0.1f);
+	if (Smooth > 0.0f && smoothingReference > 0.0f)
+	{
+		const float normalizedNorm = std::min(BestNorm, smoothingReference) / smoothingReference;
+		const float SpeedFactor = 1.0f + (1.0f - normalizedNorm);
+		TargetX /= (Smooth * SpeedFactor);
+		TargetY /= (Smooth * SpeedFactor);
+	}
 
     if (HumanizeVar)
     {
@@ -233,6 +312,14 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& A
         TargetX = HumanizedX;
         TargetY = HumanizedY;
     }
+
+    // clamp overshoot: prevent exceeding raw movement
+    float rawTargetX = rawOffsetX / (Local.Client.Sensitivity / 4);
+    float rawTargetY = rawOffsetY / (Local.Client.Sensitivity / 4);
+    if ((TargetX > 0 && TargetX > rawTargetX) || (TargetX < 0 && TargetX < rawTargetX))
+        TargetX = rawTargetX;
+    if ((TargetY > 0 && TargetY > rawTargetY) || (TargetY < 0 && TargetY < rawTargetY))
+        TargetY = rawTargetY;
 
     static DWORD lastAimTime = GetTickCount64();
     DWORD currentTick = GetTickCount64();
@@ -256,3 +343,4 @@ bool AimControl::CheckAutoMode(const std::string& WeaponName)
     else
         return true;
 }
+// map bone ID to string name

@@ -40,11 +40,11 @@ namespace bmb
 
 	void RenderWindow(int inGame)
 	{
-		if ((!MiscCFG::bmbTimer) || (inGame == 0 && !MenuConfig::ShowMenu))
+		if (!MiscCFG::bmbTimer)
 			return;
 
 		uintptr_t bomb;
-		bool isBombPlanted;
+		bool isBombPlanted = false;
 		bool IsBeingDefused;
 		float DefuseTime;
 		float defuseRemaining;
@@ -54,6 +54,10 @@ namespace bmb
 		memoryManager.ReadMemory(plantedAddress, bomb);
 		memoryManager.ReadMemory(bomb, bomb);
 		memoryManager.ReadMemory(plantedAddress - 0x8, isBombPlanted);
+
+		// If not planted and we don't have an active player context, don't render.
+		if (!isBombPlanted && inGame == 0 && !MenuConfig::ShowMenu)
+			return;
 
 		auto time = currentTimeMillis();
 
@@ -66,7 +70,7 @@ namespace bmb
 		memoryManager.ReadMemory(bomb + Offset.C4.m_bBeingDefused, IsBeingDefused);
 		memoryManager.ReadMemory(bomb + Offset.C4.m_flDefuseCountDown, DefuseTime);
 
-		if (!isPlanted && !MenuConfig::ShowMenu)
+		if (!isPlanted && !isBombPlanted && !MenuConfig::ShowMenu)
 			return;
 
 		static float windowWidth = 200.0f;

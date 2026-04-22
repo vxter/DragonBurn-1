@@ -1,9 +1,13 @@
 #pragma once
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <cmath>
 #include <chrono>
 #include <map>
+#include <algorithm>
 #include <Windows.h>
+#undef min
+#undef max
 #include <unordered_map>
 #include "../Game/Entity.h"
 #include "../OS-ImGui/imgui/imgui.h"
@@ -60,23 +64,33 @@ namespace Render
 		if (!ESPConfig::DrawFov)
 			return;
 
+		if (AimControl::AimFov <= 0.01f)
+			return;
+
 		constexpr float DEG_TO_RAD = M_PI / 180.f;
-		constexpr float STATIC_FOV = 90.0f;
-		
 		ImVec2 center = ImVec2(Gui.Window.Size.x / 2.0f, Gui.Window.Size.y / 2.0f);
-		float halfWindowSize = Gui.Window.Size.x / 2.0f;
+		float radiusScale = std::min(Gui.Window.Size.x, Gui.Window.Size.y) / 2.0f;
 
-		float staticFovTan = tan(STATIC_FOV * DEG_TO_RAD / 2.0f);
-		float aimFovTan = tan(AimControl::AimFov * DEG_TO_RAD / 2.0f);
+		float localFov = static_cast<float>(LocalEntity.Pawn.Fov);
+		if (!std::isfinite(localFov) || localFov < 1.f || localFov > 179.f)
+			localFov = 90.0f;
+		float referenceTan = tan(localFov * DEG_TO_RAD / 2.0f);
+		if (referenceTan <= 0.0f)
+			return;
 
-		float radius = (aimFovTan / staticFovTan) * halfWindowSize;
+		auto fovToRadius = [&](float fovDeg) -> float {
+			float clamped = std::clamp(fovDeg, 0.1f, 179.f);
+			float tanValue = tan(clamped * DEG_TO_RAD / 2.0f);
+			return (tanValue / referenceTan) * radiusScale;
+		};
 
+		float radius = fovToRadius(AimControl::AimFov);
 		drawList->AddCircle(center, radius, LegitBotConfig::FovCircleColor, 0, 1.5f);
 
-		if (AimControl::AimFovMin > 0)
+		if (AimControl::AimFovMin > 0.01f)
 		{
-			float aimFovMinTan = tan(AimControl::AimFovMin * DEG_TO_RAD / 2.0f);
-			float minRadius = (aimFovMinTan / staticFovTan) * halfWindowSize;
+			float minFov = std::min(AimControl::AimFovMin, AimControl::AimFov);
+			float minRadius = fovToRadius(minFov);
 			drawList->AddCircle(center, minRadius, LegitBotConfig::FovCircleColor, 0, 1.5f);
 		}
 	}
@@ -191,10 +205,10 @@ namespace Render
 		{
 			if (!boneJoint.IsVisible)
 				continue;
-			minPos.x = min(boneJoint.ScreenPos.x, minPos.x);
-			minPos.y = min(boneJoint.ScreenPos.y, minPos.y);
-			maxPos.x = max(boneJoint.ScreenPos.x, maxPos.x);
-			maxPos.y = max(boneJoint.ScreenPos.y, maxPos.y);
+		minPos.x = std::min(boneJoint.ScreenPos.x, minPos.x);
+		minPos.y = std::min(boneJoint.ScreenPos.y, minPos.y);
+		maxPos.x = std::max(boneJoint.ScreenPos.x, maxPos.x);
+		maxPos.y = std::max(boneJoint.ScreenPos.y, maxPos.y);
 		}
 
 		BoneJointPos headBone = Entity.GetBone().BonePosList[BONEINDEX::head];
@@ -205,10 +219,10 @@ namespace Render
 		const float posX = headBone.ScreenPos.x - width * 0.5f;
 		const float posY = headBone.ScreenPos.y - height * 0.08f;
 
-		minPos.x = min(minPos.x, posX);
-		minPos.y = min(minPos.y, posY);
-		maxPos.x = max(maxPos.x, posX + width);
-		maxPos.y = max(maxPos.y, posY + height);
+	minPos.x = std::min(minPos.x, posX);
+	minPos.y = std::min(minPos.y, posY);
+	maxPos.x = std::max(maxPos.x, posX + width);
+	maxPos.y = std::max(maxPos.y, posY + height);
 
 		const Vec2 size{ maxPos.x - minPos.x, maxPos.y - minPos.y };
 		return ImVec4(minPos.x, minPos.y, size.x, size.y);
@@ -292,10 +306,10 @@ namespace Render
 		{
 			if (!boneJoint.IsVisible)
 				continue;
-			minPos.x = min(boneJoint.ScreenPos.x, minPos.x);
-			minPos.y = min(boneJoint.ScreenPos.y, minPos.y);
-			maxPos.x = max(boneJoint.ScreenPos.x, maxPos.x);
-			maxPos.y = max(boneJoint.ScreenPos.y, maxPos.y);
+		minPos.x = std::min(boneJoint.ScreenPos.x, minPos.x);
+		minPos.y = std::min(boneJoint.ScreenPos.y, minPos.y);
+		maxPos.x = std::max(boneJoint.ScreenPos.x, maxPos.x);
+		maxPos.y = std::max(boneJoint.ScreenPos.y, maxPos.y);
 		}
 
 		const Vec2 size{ maxPos.x - minPos.x, maxPos.y - minPos.y };

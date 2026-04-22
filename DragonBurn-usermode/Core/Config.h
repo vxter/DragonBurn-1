@@ -77,6 +77,7 @@ namespace ESPConfig
 	inline bool ESPenabled = true;
 	inline bool AmmoBar = false;
 	inline bool ShowBoneESP = true;
+	inline bool ShowBoneLabels = false;
 	inline bool ShowBoxESP = true;
 	inline bool ShowHealthBar = true;
 	inline bool ShowWeaponESP = true;
@@ -90,6 +91,7 @@ namespace ESPConfig
 	inline bool ShowHeadBox = true;
 	inline bool ShowPreview = true;
 	inline bool VisibleCheck = false;
+	inline bool ShowHitboxBBox = false;
 	inline bool FilledBox = false;
 	inline bool FilledVisBox = false;
 	inline bool MultiColor = false;
@@ -120,6 +122,7 @@ namespace ESPConfig
 
 	inline bool EnemySound = false;
 	inline ImColor EnemySoundColor = ImColor(255, 255, 255, 255);
+	inline bool ShowAimSamples = false;
 }
 
 //namespace CrosshairsCFG

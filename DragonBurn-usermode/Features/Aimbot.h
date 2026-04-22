@@ -2,8 +2,11 @@
 #define _USE_MATH_DEFINES
 #define MAXV 10000e9
 #include <math.h>
+#include <vector>
+#include <utility>
 #include <thread>
 #include <chrono>
+#include <cstdint>
 #include "..\Game\Game.h"
 #include "..\Game\Entity.h"
 #include "..\Core\Config.h"
@@ -32,7 +35,39 @@ namespace AimControl
     inline float Smooth = 5.0f;
     inline std::vector<int> HitboxList{ BONEINDEX::head };
     inline bool HasTarget = false;
+    inline Vec2 LastTargetScreenPos{0,0};
+    inline Vec3 LastTargetWorldPos{0,0,0};
     inline bool onlyAuto = false;
+    inline bool UseEdgeSampling = true;
+
+    enum class AimSampleKind : uint8_t
+    {
+        Bone,
+        Body,
+        Edge,
+        Corner
+    };
+
+    struct AimDebugSample
+    {
+        Vec3 WorldPos;
+        Vec2 ScreenPos;
+        AimSampleKind Kind;
+        bool InsideFov = false;
+        bool VisibilityOk = false;
+        bool Accepted = false;
+    };
+
+    inline std::vector<AimDebugSample> DebugSamples;
+    inline constexpr size_t DebugSampleLimit = 256;
+
+    struct AimPoint
+    {
+        Vec3 WorldPos{ 0,0,0 };
+        int DamageScore = 0;
+        AimSampleKind Kind = AimSampleKind::Body;
+        int BoneIndex = -1;
+    };
 
     static float PrevTargetX = 0.0f;
     static float PrevTargetY = 0.0f;
@@ -42,8 +77,12 @@ namespace AimControl
 
     std::pair<float, float> Humanize(float TargetX, float TargetY);
 
-    void AimBot(const CEntity& Local, Vec3 LocalPos,std::vector<Vec3>& AimPosList);
+    // AimPosList: per-candidate world positions with priority
+    void AimBot(const CEntity& Local, Vec3 LocalPos, std::vector<AimPoint>& AimPosList);
     void switchToggle();
     std::pair<float, float> CalculateTargetOffset(const Vec2& ScreenPos, int ScreenCenterX, int ScreenCenterY);
     bool CheckAutoMode(const std::string& WeaponName);
+    void ClearDebugSamples();
+    void AddDebugSample(const Vec3& worldPos, const Vec2& screenPos, AimSampleKind kind,
+        bool insideFov, bool visibilityOk, bool accepted);
 }

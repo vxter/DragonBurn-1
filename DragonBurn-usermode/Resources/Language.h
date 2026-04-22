@@ -21,6 +21,9 @@ namespace Text {
         inline std::string FilledBox = "Filled Box";
         inline std::string FilledAlpha = "Filled Box Alpha";
         inline std::string Skeleton = "Skeleton";
+        inline std::string BoneLabels = "Bone Labels";
+        inline std::string HitboxBBox = "Hitbox Bounding Box";
+        inline std::string AimSamples = "Aim Samples Overlay";
         inline std::string HeadBox = "Head ESP";
         inline std::string EyeRay = "Eye Ray";
         inline std::string HealthBar = "Health Bar";
@@ -69,6 +72,8 @@ namespace Text {
         inline std::string HumanizeVar = "Humanize Aimbot";
         inline std::string OnlyAuto = "Only Auto";
         inline std::string OnlyAutoTip = "Aim will only work in automatic shooting mode";
+        inline std::string EdgeSampling = "Edge Sampling";
+        inline std::string EdgeSamplingTip = "Use edge points when bones are missing";
         inline std::string SmoothTip = "It's better to keep this above 6 to avoid VAC Live";
         inline std::string StartBulletTip = "It's better to keep this above 1 to avoid VAC Live";
         inline std::string OnTip = "It's better to keep this on to avoid VAC Live";

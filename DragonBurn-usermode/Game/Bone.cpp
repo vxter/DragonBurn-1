@@ -47,7 +47,7 @@ bool CBone::UpdateAllBoneData(const DWORD64& EntityPawnAddress) {
 			if (visible)
 				++visibleCount;
 
-            tmpBonePos.push_back({ originalData[i].Pos, screenPos, visible });
+            tmpBonePos.push_back({ originalData[i].Pos, screenPos, visible });			
             tmpIBone.push_back({
                 originalData[i].Pos,  // Location
                 originalData[i].Scale,  // Scale
