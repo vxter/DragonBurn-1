@@ -21,6 +21,7 @@
 #include <array>
 #include <limits>
 #include <utility>
+#include <unordered_map>
 
 #include "Cheats.h"
 #include "Render.h"
@@ -37,6 +38,135 @@
 #include "../Helpers/Logger.h"
 #include "../Features/SoundESP.h"
 #include "../Features/WebRadar.h"
+
+namespace
+{
+	inline Vec3 CrossProduct(const Vec3& a, const Vec3& b)
+	{
+		return Vec3{
+			a.y * b.z - a.z * b.y,
+			a.z * b.x - a.x * b.z,
+			a.x * b.y - a.y * b.x
+		};
+	}
+
+	inline float LengthSquared(const Vec3& v)
+	{
+		return v.x * v.x + v.y * v.y + v.z * v.z;
+	}
+
+	const char* BoneFriendlyName(size_t idx)
+	{
+		switch (idx)
+		{
+		case 0: return "root";
+		case BONEINDEX::pelvis: return "pelvis";
+		case BONEINDEX::spine_0: return "spine_0";
+		case BONEINDEX::spine_1: return "spine_1";
+		case BONEINDEX::spine_2: return "spine_2";
+		case BONEINDEX::spine_3: return "spine_3";
+		case BONEINDEX::neck_0: return "neck_0";
+		case BONEINDEX::head: return "head";
+		case 8: return "arm_upper_L";
+		case 9: return "arm_lower_L";
+		case BONEINDEX::hand_L: return "hand_L";
+		case 12: return "clavicle_R";
+		case BONEINDEX::arm_upper_R: return "arm_upper_R";
+		case BONEINDEX::arm_lower_R: return "arm_lower_R";
+		case BONEINDEX::hand_R: return "hand_R";
+		case BONEINDEX::leg_upper_L: return "leg_upper_L";
+		case BONEINDEX::leg_lower_L: return "leg_lower_L";
+		case BONEINDEX::ankle_L: return "ankle_L";
+		case BONEINDEX::leg_upper_R: return "leg_upper_R";
+		case BONEINDEX::leg_lower_R: return "leg_lower_R";
+		case BONEINDEX::ankle_R: return "ankle_R";
+		case 29: return "leg_l_offset";
+		case 30: return "leg_l_iktarget";
+		case 31: return "leg_r_offset";
+		case 32: return "leg_r_iktarget";
+		case 33: return "eyeball_L";
+		case 34: return "eyeball_R";
+		case 35: return "eye_target";
+		case 36: return "head_twist";
+		case 37: return "finger_mid_meta_L";
+		case 38: return "finger_mid_0_L";
+		case 39: return "finger_mid_1_L";
+		case 40: return "finger_mid_2_L";
+		case 41: return "finger_pinky_meta_L";
+		case 42: return "finger_pinky_0_L";
+		case 43: return "finger_pinky_1_L";
+		case 44: return "finger_pinky_2_L";
+		case 45: return "finger_index_meta_L";
+		case 46: return "finger_index_0_L";
+		case 47: return "finger_index_1_L";
+		case 48: return "finger_index_2_L";
+		case 49: return "finger_thumb_0_L";
+		case 50: return "finger_thumb_1_L";
+		case 51: return "finger_thumb_2_L";
+		case 52: return "finger_ring_meta_L";
+		case 53: return "finger_ring_0_L";
+		case 54: return "finger_ring_1_L";
+		case 55: return "finger_ring_2_L";
+		case 56: return "arm_lower_L_twist";
+		case 57: return "arm_lower_L_twist1";
+		case 58: return "arm_upper_L_twist1";
+		case 59: return "arm_upper_L_twist";
+		case 62: return "finger_mid_meta_R";
+		case 63: return "finger_mid_0_R";
+		case 64: return "finger_mid_1_R";
+		case 65: return "finger_mid_2_R";
+		case 66: return "finger_pinky_meta_R";
+		case 67: return "finger_pinky_0_R";
+		case 68: return "finger_pinky_1_R";
+		case 69: return "finger_pinky_2_R";
+		case 70: return "finger_index_meta_R";
+		case 71: return "finger_index_0_R";
+		case 72: return "finger_index_1_R";
+		case 73: return "finger_index_2_R";
+		case 74: return "finger_thumb_0_R";
+		case 75: return "finger_thumb_1_R";
+		case 76: return "finger_thumb_2_R";
+		case 77: return "finger_ring_meta_R";
+		case 78: return "finger_ring_0_R";
+		case 79: return "finger_ring_1_R";
+		case 80: return "finger_ring_2_R";
+		case 81: return "arm_lower_R_twist";
+		case 82: return "arm_lower_R_twist1";
+		case 83: return "arm_upper_R_twist1";
+		case 84: return "arm_upper_R_twist";
+		case 87: return "pect_l_aimup";
+		case 88: return "pect_r_aimup";
+		case 89: return "scap_aimup";
+		case 90: return "pectaim_l";
+		case 91: return "pecttrans_l";
+		case 92: return "pectaim_r";
+		case 93: return "pecttrans_r";
+		case 94: return "scap_r_aimat";
+		case 95: return "scap_l_aimat";
+		case 96: return "pect_l_ptbase";
+		case 97: return "pect_r_ptbase";
+		case 98: return "ball_L";
+		case 99: return "leg_upper_L_twist";
+		case 100: return "leg_upper_L_twist1";
+		case 101: return "ball_R";
+		case 102: return "leg_upper_R_twist";
+		case 103: return "leg_upper_R_twist1";
+		case 104: return "feet_L";
+		case 105: return "leg_upper_L_jiggle";
+		case 106: return "leg_upper_L_jiggle2";
+		case 107: return "climbinggear_01";
+		case 108: return "climbinggear_02";
+		case 109: return "feet_R";
+		case 110: return "leg_upper_R_jiggle";
+		case 111: return "leg_upper_R_jiggle2";
+		case 112: return "holster";
+		case 113: return "pistol_attachment";
+		case 114: return "knife_attachment";
+		case 124: return "main_weapon_attachment";
+		default: return nullptr;
+		}
+	}
+}
 
 int PreviousTotalHits = 0;
 
@@ -452,14 +582,23 @@ void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& loca
 	const float referenceTan = tanf(referenceFov * DEG_TO_RAD / 2.f);
 	const float radiusScale = std::min(Gui.Window.Size.x, Gui.Window.Size.y) / 2.f;
 	const bool enforceAimFov = AimControl::AimFov > 0.01f && referenceTan > 0.f;
+	const float aimFovDeg = std::clamp(AimControl::AimFov, 0.1f, 179.f);
 	float aimFovRadius = std::numeric_limits<float>::infinity();
+	float aimFovRadiusSq = aimFovRadius * aimFovRadius;
 	if (enforceAimFov)
 	{
-		float aimFovDeg = std::clamp(AimControl::AimFov, 0.1f, 179.f);
 		float aimTan = tanf(aimFovDeg * DEG_TO_RAD / 2.f);
 		aimFovRadius = (aimTan / referenceTan) * radiusScale;
+		aimFovRadiusSq = aimFovRadius * aimFovRadius;
 	}
-	const float aimFovRadiusSq = aimFovRadius * aimFovRadius;
+	float minAimFovRadiusSq = 0.f;
+	if (enforceAimFov && AimControl::AimFovMin > 0.01f)
+	{
+		float minFovDeg = std::clamp(AimControl::AimFovMin, 0.1f, aimFovDeg);
+		float minTan = tanf(minFovDeg * DEG_TO_RAD / 2.f);
+		float minRadius = (minTan / referenceTan) * radiusScale;
+		minAimFovRadiusSq = minRadius * minRadius;
+	}
 
 	for (const auto& result : entities)
 	{
@@ -474,6 +613,7 @@ void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& loca
 		const int entityIndex = result.entityIndex;
 
 		const DWORD64 entityMask = indexToMask(entityIndex);
+		const bool targetMaskVisible = ((entity.Pawn.bSpottedByMask & localMask) != 0);
 
 		// add entity to radar
 		if (RadarCFG::ShowRadar && localEntity.Controller.TeamID != 0)
@@ -519,9 +659,6 @@ void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& loca
 					bboxCorners[7] = { bboxMax.x, bboxMax.y, bboxMax.z };
 				}
 
-				const bool passesVisibility = (!LegitBotConfig::VisibleCheck) ||
-					((entity.Pawn.bSpottedByMask & localMask) != 0) ||
-					((localEntity.Pawn.bSpottedByMask & entityMask) != 0);
 				auto boneDamageScore = [](int boneId) -> int {
 					switch (boneId)
 					{
@@ -535,7 +672,7 @@ void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& loca
 					default: return 70;
 					}
 				};
-				auto tryPushCandidate = [&](const Vec3& candidate, AimControl::AimSampleKind kind, int damageScore, int boneIndex = -1) -> bool {
+				auto tryPushCandidate = [&](const Vec3& candidate, AimControl::AimSampleKind kind, int damageScore, int boneIndex = -1, bool boneVisible = false) -> bool {
 					if (!std::isfinite(candidate.x) || !std::isfinite(candidate.y) || !std::isfinite(candidate.z))
 						return false;
 					Vec2 projected;
@@ -545,27 +682,135 @@ void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& loca
 					const float dy = projected.y - screenCenter.y;
 					const float distSq = dx * dx + dy * dy;
 					const bool insideFov = distSq <= aimFovRadiusSq;
-					const bool accepted = passesVisibility && (!enforceAimFov || insideFov);
-					AimControl::AddDebugSample(candidate, projected, kind, insideFov, passesVisibility, accepted);
-					if (!accepted)
+					const bool onScreen = (projected.x >= 0.f && projected.x <= Gui.Window.Size.x && projected.y >= 0.f && projected.y <= Gui.Window.Size.y);
+					bool visibilityOk = true;
+					if (LegitBotConfig::VisibleCheck)
+					{
+						visibilityOk = targetMaskVisible && onScreen;
+					}
+					if (!visibilityOk)
+					{
+						AimControl::AddDebugSample(candidate, projected, kind, insideFov, false, false, boneIndex);
 						return false;
+					}
+					const bool withinFov = (!enforceAimFov || insideFov);
+					AimControl::AddDebugSample(candidate, projected, kind, insideFov, true, withinFov, boneIndex);
 					AimControl::AimPoint point;
 					point.WorldPos = candidate;
 					point.DamageScore = damageScore;
 					point.Kind = kind;
 					point.BoneIndex = boneIndex;
+					point.ScreenPos = projected;
+					point.HasScreenPos = true;
+					point.ScreenDistSq = distSq;
+					if (std::isfinite(aimFovRadiusSq) && aimFovRadiusSq > 0.f)
+						point.ScreenDistRatio = std::clamp(distSq / aimFovRadiusSq, 0.f, 1.f);
+					else
+						point.ScreenDistRatio = 0.f;
+					point.InsideScreenFov = withinFov;
+					point.InsideScreenDeadzone = (minAimFovRadiusSq > 0.f && distSq < minAimFovRadiusSq);
 					aimPosList.push_back(point);
 					return true;
 				};
+				auto addHeadCircleSamples = [&](const Vec3& headPos, const Vec3& neckPos, int baseDamage, bool& headAccepted, bool baseVisible) {
+					auto isFiniteVec = [](const Vec3& v) {
+						return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+					};
+					if (!isFiniteVec(headPos) || !isFiniteVec(neckPos))
+						return;
+					Vec3 up = headPos - neckPos;
+					const float upLenSq = LengthSquared(up);
+					if (upLenSq < 1e-4f)
+						return;
+					const float upLen = sqrtf(upLenSq);
+					up = up / upLen;
+					Vec3 tangent = CrossProduct(up, Vec3{ 0.f, 0.f, 1.f });
+					if (LengthSquared(tangent) < 1e-4f)
+						tangent = CrossProduct(up, Vec3{ 0.f, 1.f, 0.f });
+					if (LengthSquared(tangent) < 1e-4f)
+						tangent = CrossProduct(up, Vec3{ 1.f, 0.f, 0.f });
+					if (LengthSquared(tangent) < 1e-4f)
+						return;
+					tangent.Normalize();
+					Vec3 bitangent = CrossProduct(up, tangent);
+					if (LengthSquared(bitangent) < 1e-4f)
+						return;
+					bitangent.Normalize();
+					const float radius = std::clamp(upLen * 0.65f, 1.2f, 8.5f);
+					constexpr int circleSegments = 6;
+					const int circleDamage = std::max(baseDamage - 5, 60);
+					for (int i = 0; i < circleSegments; ++i)
+					{
+						if (i == 0 || i == circleSegments / 2)
+							continue;
+						float angle = (2.0f * 3.14159265f * i) / circleSegments;
+						float c = cosf(angle);
+						float s = sinf(angle);
+						Vec3 offset = (tangent * c + bitangent * s) * radius;
+						if (tryPushCandidate(headPos + offset, AimControl::AimSampleKind::Bone, circleDamage, BONEINDEX::head, baseVisible))
+							headAccepted = true;
+					}
+					const float crownLift = radius * 0.6f;
+					const float crownRadius = radius * 0.5f;
+					if (crownLift > 0.05f)
+					{
+						Vec3 apex = headPos + up * crownLift;
+						if (tryPushCandidate(apex, AimControl::AimSampleKind::Bone, circleDamage, BONEINDEX::head, baseVisible))
+							headAccepted = true;
+						for (int i = 0; i < circleSegments; ++i)
+						{
+							if (i == 0 || i == circleSegments / 2)
+								continue;
+							float angle = (2.0f * 3.14159265f * i) / circleSegments;
+							float c = cosf(angle);
+							float s = sinf(angle);
+							Vec3 offset = up * crownLift + (tangent * c + bitangent * s) * crownRadius;
+							if (tryPushCandidate(headPos + offset, AimControl::AimSampleKind::Bone, circleDamage, BONEINDEX::head, baseVisible))
+								headAccepted = true;
+						}
+					}
+				};
 
 				bool hasPrimary = false;
+				bool headCircleAttempted = false;
 				for (int hb : AimControl::HitboxList) {
 					if (hb < 0 || static_cast<size_t>(hb) >= bonePosList.size())
 						continue;
-					const Vec3 tempPos = bonePosList[hb].Pos;
-					if (tryPushCandidate(tempPos, AimControl::AimSampleKind::Bone, boneDamageScore(hb), hb)) {
+					Vec3 tempPos = bonePosList[hb].Pos;
+					if (hb == BONEINDEX::head && (AimControl::HeadOffset != 0.f || AimControl::HeadDropOffset != 0.f))
+					{
+						if (AimControl::HeadOffset != 0.f)
+						{
+							float yawRad = entity.Pawn.ViewAngle.y * (3.14159265f / 180.f);
+							Vec3 backDir{ -cosf(yawRad), -sinf(yawRad), 0.f };
+							float backLen = sqrtf(backDir.x * backDir.x + backDir.y * backDir.y);
+							if (backLen > 0.01f)
+								tempPos = tempPos + (backDir / backLen) * AimControl::HeadOffset;
+						}
+						if (AimControl::HeadDropOffset != 0.f)
+						{
+							const size_t neckIdx = static_cast<size_t>(BONEINDEX::neck_0);
+							if (neckIdx < bonePosList.size())
+							{
+								Vec3 dir = bonePosList[neckIdx].Pos - tempPos;
+								float dirLen = sqrtf(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+								if (dirLen > 0.01f)
+									tempPos = tempPos + (dir / dirLen) * AimControl::HeadDropOffset;
+							}
+						}
+					}
+					if (tryPushCandidate(tempPos, AimControl::AimSampleKind::Bone, boneDamageScore(hb), hb, bonePosList[hb].IsVisible)) {
 						hasPrimary = true;
 					}
+					if (hb == BONEINDEX::head && !headCircleAttempted)
+					{
+						headCircleAttempted = true;
+						const size_t neckIdx = static_cast<size_t>(BONEINDEX::neck_0);
+						if (neckIdx < bonePosList.size())
+						{
+							addHeadCircleSamples(tempPos, bonePosList[neckIdx].Pos, boneDamageScore(BONEINDEX::head), hasPrimary, bonePosList[hb].IsVisible);
+					}
+				}
 				}
 
 				Vec3 bboxCenter{
@@ -715,46 +960,61 @@ void Cheats::HandleEnts(const std::vector<EntityResult>& entities, CEntity& loca
                     Render::DrawArmorBar(entity.Controller.Address, 100, entity.Pawn.Armor, HasHelmet, ArmorBarPos, ArmorBarSize);
                 }
 
-                // display visible bone names/IDs
-                if (ESPConfig::ShowBoneESP && ESPConfig::ShowBoneLabels)
-                {
-                    auto drawList = ImGui::GetBackgroundDrawList();
-                    const auto& boneList = entity.GetBone().BonePosList;
-                    for (size_t bi = 0; bi < boneList.size(); ++bi)
-                    {
-                        const auto& bp = boneList[bi];
-                        if (!bp.IsVisible)
-                            continue;
-                        ImVec2 pos{ bp.ScreenPos.x, bp.ScreenPos.y };
-                        char buf[32];
-                        // show bone enum name and index
-                        const char* name = "unk";
-                        switch ((BONEINDEX)bi) {
-                        case pelvis:     name = "pelvis"; break;
-                        case spine_0:    name = "spine_0"; break;
-                        case spine_1:    name = "spine_1"; break;
-                        case spine_2:    name = "spine_2"; break;
-                        case spine_3:    name = "spine_3"; break;
-                        case neck_0:     name = "neck_0"; break;
-                        case head:       name = "head"; break;
-                        case arm_upper_L:name = "arm_upper_L"; break;
-                        case arm_lower_L:name = "arm_lower_L"; break;
-                        case hand_L:     name = "hand_L"; break;
-                        case arm_upper_R:name = "arm_upper_R"; break;
-                        case arm_lower_R:name = "arm_lower_R"; break;
-                        case hand_R:     name = "hand_R"; break;
-                        case leg_upper_L:name = "leg_upper_L"; break;
-                        case leg_lower_L:name = "leg_lower_L"; break;
-                        case ankle_L:    name = "ankle_L"; break;
-                        case leg_upper_R:name = "leg_upper_R"; break;
-                        case leg_lower_R:name = "leg_lower_R"; break;
-                        case ankle_R:    name = "ankle_R"; break;
-                        default: break;
-                        }
-                        std::snprintf(buf, sizeof(buf), "%s[%zu]", name, bi);
-                        drawList->AddText(pos, IM_COL32(255,255,255,200), buf);
-                    }
-                }
+				// display visible bone names/IDs
+				if (ESPConfig::ShowBoneESP && ESPConfig::ShowBoneLabels)
+				{
+					auto drawList = ImGui::GetBackgroundDrawList();
+					const auto& boneList = entity.GetBone().BonePosList;
+					ImU32 visibleColor = ESPConfig::BoneColor;
+					const ImU32 occludedColor = IM_COL32(160, 160, 160, 220);
+					for (size_t bi = 0; bi < boneList.size(); ++bi)
+					{
+						const auto& bp = boneList[bi];
+						Vec2 projected = bp.ScreenPos;
+						if (!bp.IsVisible)
+						{
+							if (!gGame.View.WorldToScreen(bp.Pos, projected))
+								continue;
+						}
+						ImVec2 pos{ projected.x, projected.y };
+						const char* friendly = BoneFriendlyName(bi);
+						char buf[64];
+						if (friendly)
+							std::snprintf(buf, sizeof(buf), "[%03zu] %s", bi, friendly);
+						else
+							std::snprintf(buf, sizeof(buf), "[%03zu] bone_%03zu", bi, bi);
+						const ImU32 labelColor = bp.IsVisible ? visibleColor : occludedColor;
+						drawList->AddText(pos, labelColor, buf);
+					}
+				}
+
+				{
+					static std::unordered_map<DWORD64, ULONGLONG> s_lastBoneDump;
+					const auto& boneList = entity.GetBone().BonePosList;
+					if (ESPConfig::DumpBoneData && !boneList.empty())
+					{
+						ULONGLONG now = GetTickCount64();
+						ULONGLONG& lastTick = s_lastBoneDump[entity.Controller.Address];
+						if (now - lastTick >= 2000)
+						{
+							lastTick = now;
+							std::printf("[BoneDump] entity=0x%llx bones=%zu\n", entity.Controller.Address, boneList.size());
+							for (size_t bi = 0; bi < boneList.size(); ++bi)
+							{
+								const auto& bp = boneList[bi];
+								const char* friendly = BoneFriendlyName(bi);
+								std::printf("  [%03zu]%s vis=%d pos=(%.2f, %.2f, %.2f)\n", bi,
+									friendly ? friendly : "",
+									bp.IsVisible ? 1 : 0,
+									bp.Pos.x, bp.Pos.y, bp.Pos.z);
+							}
+						}
+					}
+					else if (!ESPConfig::DumpBoneData && !s_lastBoneDump.empty())
+					{
+						s_lastBoneDump.clear();
+					}
+				}
 			}
 		}
 	}
@@ -793,14 +1053,21 @@ void Visual(const CEntity& LocalEntity)
 
 	if (ESPConfig::ShowAimSamples && !AimControl::DebugSamples.empty())
 	{
-		auto sampleLabel = [](AimControl::AimSampleKind kind) -> const char*
+		auto sampleLabel = [](AimControl::AimSampleKind kind, int boneIndex) -> std::string
 		{
 			switch (kind)
 			{
-			case AimControl::AimSampleKind::Bone: return "B";
-			case AimControl::AimSampleKind::Body: return "C";
-			case AimControl::AimSampleKind::Edge: return "E";
-			case AimControl::AimSampleKind::Corner: return "R";
+			case AimControl::AimSampleKind::Bone:
+			{
+				const char* name = BoneFriendlyName(boneIndex);
+				if (name)
+					return std::string("B:") + name;
+				else
+					return "B:" + std::to_string(boneIndex);
+			}
+			case AimControl::AimSampleKind::Body: return "Body";
+			case AimControl::AimSampleKind::Edge: return "Edge";
+			case AimControl::AimSampleKind::Corner: return "Corner";
 			default: return "?";
 			}
 		};
@@ -821,7 +1088,7 @@ void Visual(const CEntity& LocalEntity)
 			drawList->AddCircleFilled(screen, radius, color, 0);
 			if (drawLabels)
 			{
-				drawList->AddText(ImVec2(screen.x + 5.0f, screen.y - 6.0f), IM_COL32(255, 255, 255, 220), sampleLabel(sample.Kind));
+				drawList->AddText(ImVec2(screen.x + 5.0f, screen.y - 6.0f), IM_COL32(255, 255, 255, 220), sampleLabel(sample.Kind, sample.BoneIndex).c_str());
 			}
 		}
 	}

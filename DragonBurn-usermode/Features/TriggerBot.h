@@ -15,6 +15,12 @@ namespace TriggerBot
 	inline bool StopedOnly = false;
 	inline bool TTDtimeout = false;
 	inline bool VisibleCheck = true;
+	inline bool AdaptiveDelay = true;
+	inline int AdaptiveMaxExtraDelay = 120; // ms
+	inline int AdaptiveRecoilScale = 60; // ms per degree of recoil
+	inline int AdaptiveDerivativeScale = 90; // ms per rising degree
+	inline int AdaptiveSuppressionTicks = 2;
+	inline int AdaptiveRecoveryMs = 160;
 
     // Input configuration
     inline int HotKey = VK_XBUTTON2;

@@ -31,6 +31,7 @@ namespace MyConfigSaver
         ConfigData["ESP"]["Enable"]=                ESPConfig::ESPenabled;
         ConfigData["ESP"]["BoneESP"]=               ESPConfig::ShowBoneESP;
         ConfigData["ESP"]["BoneLabels"]=            ESPConfig::ShowBoneLabels;
+        ConfigData["ESP"]["BoneDump"]=              ESPConfig::DumpBoneData;
         ConfigData["ESP"]["BoxESP"]=                ESPConfig::ShowBoxESP;
         ConfigData["ESP"]["BoxType"]=               ESPConfig::BoxType;
         ConfigData["ESP"]["SnapLine"]=              ESPConfig::ShowLineToEnemy;
@@ -170,6 +171,7 @@ namespace MyConfigSaver
         ConfigData["Aimbot"]["Fov"]=              AimControl::AimFov;
         ConfigData["Aimbot"]["HumanizationStrength"]=              AimControl::HumanizationStrength;
         ConfigData["Aimbot"]["FovMin"]=           AimControl::AimFovMin;
+        ConfigData["Aimbot"]["MinFovDeadzone"]=   AimControl::UseMinFovDeadzone;
         ConfigData["Aimbot"]["FovCircle"]=        ESPConfig::DrawFov;
 
         ConfigData["Aimbot"]["Smooth"]=           AimControl::Smooth;
@@ -180,6 +182,8 @@ namespace MyConfigSaver
         ConfigData["Aimbot"]["ScopeOnly"]=        AimControl::ScopeOnly;
         ConfigData["Aimbot"]["OnlyAuto"] =        AimControl::onlyAuto;
         ConfigData["Aimbot"]["EdgeSampling"] =    AimControl::UseEdgeSampling;
+        ConfigData["Aimbot"]["HeadOffset"] =     AimControl::HeadOffset;
+        ConfigData["Aimbot"]["HeadDropOffset"] =  AimControl::HeadDropOffset;
 
         ConfigData["Aimbot"]["CircleColor"]["r"]= LegitBotConfig::FovCircleColor.Value.x;
         ConfigData["Aimbot"]["CircleColor"]["g"]= LegitBotConfig::FovCircleColor.Value.y;
@@ -204,6 +208,12 @@ namespace MyConfigSaver
         ConfigData["Triggerbot"]["StopedOnly"] = TriggerBot::StopedOnly;
         ConfigData["Triggerbot"]["TTDtimeout"] = TriggerBot::TTDtimeout;
         ConfigData["Triggerbot"]["AutoMode"]=     LegitBotConfig::TriggerAlways;
+        ConfigData["Triggerbot"]["AdaptiveEnabled"] = TriggerBot::AdaptiveDelay;
+        ConfigData["Triggerbot"]["AdaptiveMaxExtra"] = TriggerBot::AdaptiveMaxExtraDelay;
+        ConfigData["Triggerbot"]["AdaptiveRecoilScale"] = TriggerBot::AdaptiveRecoilScale;
+        ConfigData["Triggerbot"]["AdaptiveDerivativeScale"] = TriggerBot::AdaptiveDerivativeScale;
+        ConfigData["Triggerbot"]["AdaptiveSuppressionTicks"] = TriggerBot::AdaptiveSuppressionTicks;
+        ConfigData["Triggerbot"]["AdaptiveRecoveryMs"] = TriggerBot::AdaptiveRecoveryMs;
 
 
 
@@ -282,6 +292,7 @@ namespace MyConfigSaver
             ESPConfig::ESPenabled = ReadData(ConfigData["ESP"], { "Enable" }, false);
             ESPConfig::ShowBoneESP = ReadData(ConfigData["ESP"], { "BoneESP" }, false);
             ESPConfig::ShowBoneLabels = ReadData(ConfigData["ESP"], { "BoneLabels" }, false);
+            ESPConfig::DumpBoneData = ReadData(ConfigData["ESP"], { "BoneDump" }, false);
             ESPConfig::ShowBoxESP = ReadData(ConfigData["ESP"],{"BoxESP"}, false);
             ESPConfig::BoxType = ReadData(ConfigData["ESP"], { "BoxType" }, 0);
             ESPConfig::ShowLineToEnemy = ReadData(ConfigData["ESP"], { "SnapLine" }, false);
@@ -426,7 +437,8 @@ namespace MyConfigSaver
             AimControl::AimBullet = ReadData(ConfigData["Aimbot"],{"AimBullet"}, 0);
             AimControl::AimFov = ReadData(ConfigData["Aimbot"],{"Fov"}, 5.f);
             AimControl::HumanizationStrength = ReadData(ConfigData["Aimbot"],{"HumanizationStrength"}, 5);
-            AimControl::AimFovMin = ReadData(ConfigData["Aimbot"],{"FovMin"}, .5f);
+            AimControl::AimFovMin = ReadData(ConfigData["Aimbot"],{"FovMin"}, 0.0f);
+            AimControl::UseMinFovDeadzone = ReadData(ConfigData["Aimbot"], { "MinFovDeadzone" }, false);
             ESPConfig::DrawFov = ReadData(ConfigData["Aimbot"],{"FovCircle"}, false);
             LegitBotConfig::FovCircleColor.Value.x = ReadData(ConfigData["Aimbot"],{"CircleColor","r"}, 0.f);
             LegitBotConfig::FovCircleColor.Value.y = ReadData(ConfigData["Aimbot"],{"CircleColor","g"}, 0.f);
@@ -440,6 +452,8 @@ namespace MyConfigSaver
             AimControl::ScopeOnly = ReadData(ConfigData["Aimbot"],{"ScopeOnly"}, false);
         AimControl::onlyAuto = ReadData(ConfigData["Aimbot"], { "OnlyAuto" }, false);
         AimControl::UseEdgeSampling = ReadData(ConfigData["Aimbot"], { "EdgeSampling" }, true);
+            AimControl::HeadOffset = ReadData(ConfigData["Aimbot"], { "HeadOffset" }, 0.0f);
+            AimControl::HeadDropOffset = ReadData(ConfigData["Aimbot"], { "HeadDropOffset" }, 0.0f);
             Text::Aimbot::HotKey = KeyMgr::GetKeyName(AimControl::HotKey);
             LegitBotConfig::HitboxUpdated = false;
         }
@@ -463,6 +477,12 @@ namespace MyConfigSaver
             TriggerBot::StopedOnly = ReadData(ConfigData["Triggerbot"], { "StopedOnly" }, false);
             TriggerBot::TTDtimeout = ReadData(ConfigData["Triggerbot"], { "TTDtimeout" }, false);
             LegitBotConfig::TriggerAlways = ReadData(ConfigData["Triggerbot"],{"AutoMode"}, false);
+            TriggerBot::AdaptiveDelay = ReadData(ConfigData["Triggerbot"], {"AdaptiveEnabled"}, TriggerBot::AdaptiveDelay);
+            TriggerBot::AdaptiveMaxExtraDelay = ReadData(ConfigData["Triggerbot"], {"AdaptiveMaxExtra"}, TriggerBot::AdaptiveMaxExtraDelay);
+            TriggerBot::AdaptiveRecoilScale = ReadData(ConfigData["Triggerbot"], {"AdaptiveRecoilScale"}, TriggerBot::AdaptiveRecoilScale);
+            TriggerBot::AdaptiveDerivativeScale = ReadData(ConfigData["Triggerbot"], {"AdaptiveDerivativeScale"}, TriggerBot::AdaptiveDerivativeScale);
+            TriggerBot::AdaptiveSuppressionTicks = ReadData(ConfigData["Triggerbot"], {"AdaptiveSuppressionTicks"}, TriggerBot::AdaptiveSuppressionTicks);
+            TriggerBot::AdaptiveRecoveryMs = ReadData(ConfigData["Triggerbot"], {"AdaptiveRecoveryMs"}, TriggerBot::AdaptiveRecoveryMs);
             Text::Trigger::HotKey = KeyMgr::GetKeyName(TriggerBot::HotKey);
         }
 

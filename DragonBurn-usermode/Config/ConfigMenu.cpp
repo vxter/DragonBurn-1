@@ -169,6 +169,7 @@ namespace ConfigMenu {
 		ESPConfig::ShowDistance = false;
 		ESPConfig::ShowBoneESP = true;
 		ESPConfig::ShowBoneLabels = false;
+		ESPConfig::DumpBoneData = false;
 		ESPConfig::HotKey = VK_F6;
 		ESPConfig::ShowBoxESP = true;
 		ESPConfig::ShowHealthBar = true;
@@ -231,13 +232,22 @@ namespace ConfigMenu {
 		AimControl::HotKey = 1;
 		Text::Aimbot::HotKey = KeyMgr::GetKeyName(AimControl::HotKey);
 		AimControl::AimFov = 10;
-		AimControl::AimFovMin = 0.4f;
+		AimControl::AimFovMin = 0.0f;
+		AimControl::UseMinFovDeadzone = false;
 		AimControl::Smooth = 5.0f;
+		AimControl::HeadOffset = 0.0f;
+		AimControl::HeadDropOffset = 0.0f;
 
 		ESPConfig::ShowLineToEnemy = false;
 		LegitBotConfig::FovLineSize = 60.0f;
 		TriggerBot::TriggerDelay = 10;
 		TriggerBot::ShotDuration = 400;
+		TriggerBot::AdaptiveDelay = true;
+		TriggerBot::AdaptiveMaxExtraDelay = 120;
+		TriggerBot::AdaptiveRecoilScale = 60;
+		TriggerBot::AdaptiveDerivativeScale = 90;
+		TriggerBot::AdaptiveSuppressionTicks = 2;
+		TriggerBot::AdaptiveRecoveryMs = 160;
 
 		RCS::RCSBullet = 1;
 		LegitBotConfig::RCS = true;

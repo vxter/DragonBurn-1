@@ -94,6 +94,7 @@ bool CEntity::UpdatePawn(const DWORD64& PlayerPawnAddress)
 	//if (!this->Pawn.GetDefusing())
 	//	return false;
 	this->Pawn.GetFlashDuration();
+	this->Pawn.GetWaitForNoAttack();
 	this->Pawn.GetVelocity();
 	this->Pawn.GetAimPunchCache();
 	this->Pawn.BoneData.UpdateAllBoneData(PlayerPawnAddress);
@@ -299,6 +300,11 @@ bool PlayerPawn::GetFov()
 bool PlayerPawn::GetFlashDuration()
 {
 	return memoryManager.ReadMemory(Address + Offset.Pawn.flFlashDuration, this->FlashDuration);
+}
+
+bool PlayerPawn::GetWaitForNoAttack()
+{
+	return GetDataAddressWithOffset<bool>(Address, Offset.Pawn.m_bWaitForNoAttack, this->WaitForNoAttack);
 }
 
 bool PlayerPawn::GetVelocity()

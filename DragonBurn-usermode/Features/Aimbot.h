@@ -31,7 +31,8 @@ namespace AimControl
     inline bool HumanizeVar = true;
     inline int HumanizationStrength = 5;
     inline float AimFov = 10;
-    inline float AimFovMin = 0.4f;
+    inline float AimFovMin = 0.0f;
+    inline bool UseMinFovDeadzone = false;
     inline float Smooth = 5.0f;
     inline std::vector<int> HitboxList{ BONEINDEX::head };
     inline bool HasTarget = false;
@@ -39,6 +40,8 @@ namespace AimControl
     inline Vec3 LastTargetWorldPos{0,0,0};
     inline bool onlyAuto = false;
     inline bool UseEdgeSampling = true;
+    inline float HeadOffset = 0.0f;
+    inline float HeadDropOffset = 0.0f;
 
     enum class AimSampleKind : uint8_t
     {
@@ -53,6 +56,7 @@ namespace AimControl
         Vec3 WorldPos;
         Vec2 ScreenPos;
         AimSampleKind Kind;
+        int BoneIndex = -1;
         bool InsideFov = false;
         bool VisibilityOk = false;
         bool Accepted = false;
@@ -67,6 +71,12 @@ namespace AimControl
         int DamageScore = 0;
         AimSampleKind Kind = AimSampleKind::Body;
         int BoneIndex = -1;
+        Vec2 ScreenPos{ 0,0 };
+        bool HasScreenPos = false;
+        float ScreenDistSq = 0.f;
+        float ScreenDistRatio = 0.f;
+        bool InsideScreenFov = false;
+        bool InsideScreenDeadzone = false;
     };
 
     static float PrevTargetX = 0.0f;
@@ -84,5 +94,5 @@ namespace AimControl
     bool CheckAutoMode(const std::string& WeaponName);
     void ClearDebugSamples();
     void AddDebugSample(const Vec3& worldPos, const Vec2& screenPos, AimSampleKind kind,
-        bool insideFov, bool visibilityOk, bool accepted);
+        bool insideFov, bool visibilityOk, bool accepted, int boneIndex = -1);
 }

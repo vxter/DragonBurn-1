@@ -2,9 +2,154 @@
 #include <chrono>
 #include <random>
 #include <thread>
+#include <algorithm>
+#include <cmath>
+
+#include "../Core/GlobalVars.h"
+
+#ifdef max
+#undef max
+#endif
+#ifdef min
+#undef min
+#endif
+
+namespace
+{
+    float EstimateTickIntervalMs()
+    {
+        if (g_globalVars && g_globalVars->g_fIntervalPerTick > 0.0001f)
+        {
+            return std::clamp(g_globalVars->g_fIntervalPerTick * 1000.f, 1.f, 100.f);
+        }
+        return 15.625f;
+    }
+
+    bool ReadLatestAimPunch(const CEntity& entity, Vec2& outPunch)
+    {
+        const auto count = static_cast<DWORD>(entity.Pawn.AimPunchCache.Count);
+        if (count > 0 && count < 0xFFFF && entity.Pawn.AimPunchCache.Data != 0)
+        {
+            Vec2 punchSample{};
+            if (memoryManager.ReadMemory<Vec2>(entity.Pawn.AimPunchCache.Data + (count - 1) * sizeof(Vec3), punchSample))
+            {
+                outPunch = punchSample;
+                return true;
+            }
+        }
+
+        outPunch = entity.Pawn.AimPunchAngle;
+        return true;
+    }
+
+    class AdaptiveDelayController
+    {
+    public:
+        long long AdvanceTarget(const CEntity& entity)
+        {
+            const float dt = ConsumeDeltaMs();
+
+            Vec2 punch{};
+            ReadLatestAimPunch(entity, punch);
+            const float magnitude = std::sqrt(punch.x * punch.x + punch.y * punch.y);
+
+            float rising = 0.f;
+            if (!magnitudeInitialized)
+            {
+                smoothedMagnitude = magnitude;
+                previousMagnitude = magnitude;
+                magnitudeInitialized = true;
+            }
+            else
+            {
+                const float recoveryWindow = std::max(1.f, static_cast<float>(TriggerBot::AdaptiveRecoveryMs));
+                const float alpha = std::clamp(dt / recoveryWindow, 0.f, 1.f);
+                smoothedMagnitude += alpha * (magnitude - smoothedMagnitude);
+                rising = std::max(0.f, magnitude - previousMagnitude);
+                previousMagnitude = magnitude;
+            }
+
+            const float suppressionHold = TriggerBot::AdaptiveSuppressionTicks * EstimateTickIntervalMs();
+            if (entity.Pawn.WaitForNoAttack)
+            {
+                suppressionTimerMs = std::max(suppressionTimerMs, suppressionHold);
+            }
+            suppressionTimerMs = std::max(0.f, suppressionTimerMs - dt);
+
+            float penalty = TriggerBot::AdaptiveRecoilScale * smoothedMagnitude +
+                TriggerBot::AdaptiveDerivativeScale * rising +
+                suppressionTimerMs;
+            penalty = std::clamp(penalty, 0.f, static_cast<float>(TriggerBot::AdaptiveMaxExtraDelay));
+
+            return static_cast<long long>(TriggerBot::TriggerDelay + penalty);
+        }
+
+        void AdvanceIdle()
+        {
+            const float dt = ConsumeDeltaMs();
+            const float recoveryWindow = std::max(1.f, static_cast<float>(TriggerBot::AdaptiveRecoveryMs));
+            const float decay = std::clamp(dt / recoveryWindow, 0.f, 1.f);
+            smoothedMagnitude -= smoothedMagnitude * decay;
+            previousMagnitude -= previousMagnitude * decay;
+            if (smoothedMagnitude < 0.f)
+                smoothedMagnitude = 0.f;
+            if (previousMagnitude < 0.f)
+                previousMagnitude = 0.f;
+            suppressionTimerMs = std::max(0.f, suppressionTimerMs - dt);
+        }
+
+    private:
+        float ConsumeDeltaMs()
+        {
+            const auto now = std::chrono::steady_clock::now();
+            if (!timingInitialized)
+            {
+                timingInitialized = true;
+                lastUpdate = now;
+                return EstimateTickIntervalMs();
+            }
+
+            const float dt = std::chrono::duration<float, std::milli>(now - lastUpdate).count();
+            lastUpdate = now;
+            return std::clamp(dt, 1.f, 250.f);
+        }
+
+        float smoothedMagnitude = 0.f;
+        float previousMagnitude = 0.f;
+        float suppressionTimerMs = 0.f;
+        std::chrono::steady_clock::time_point lastUpdate = std::chrono::steady_clock::now();
+        bool timingInitialized = false;
+        bool magnitudeInitialized = false;
+    };
+
+    AdaptiveDelayController g_adaptiveDelay;
+
+    struct AdaptiveDelayScope
+    {
+        bool consumed = false;
+
+        long long Consume(const CEntity& entity)
+        {
+            consumed = true;
+            if (!TriggerBot::AdaptiveDelay)
+                return TriggerBot::TriggerDelay;
+            return g_adaptiveDelay.AdvanceTarget(entity);
+        }
+
+        ~AdaptiveDelayScope()
+        {
+            if (consumed || !TriggerBot::AdaptiveDelay)
+                return;
+            g_adaptiveDelay.AdvanceIdle();
+        }
+    };
+}
 
 void TriggerBot::Run(const CEntity& LocalEntity, const int& LocalPlayerControllerIndex)
 {
+    AdaptiveDelayScope adaptiveScope;
+    long long requiredDelayMs = TriggerDelay;
+
     if (MenuConfig::ShowMenu)
         return;
 
@@ -57,6 +202,7 @@ void TriggerBot::Run(const CEntity& LocalEntity, const int& LocalPlayerControlle
         g_TargetFoundTime = std::chrono::system_clock::now();
     }
     g_HasValidTarget = true;
+    requiredDelayMs = adaptiveScope.Consume(LocalEntity);
 
     auto now = std::chrono::system_clock::now();
 
@@ -69,7 +215,7 @@ void TriggerBot::Run(const CEntity& LocalEntity, const int& LocalPlayerControlle
     // check conditions to shoot
     if ((GetAsyncKeyState(TriggerBot::HotKey) || LegitBotConfig::TriggerAlways) &&
         timeSinceLastShot >= ShotDuration &&
-        timeSinceTargetFound >= TriggerDelay)
+        timeSinceTargetFound >= requiredDelayMs)
     { ExecuteShot(); }
 }
 
@@ -84,11 +230,8 @@ bool TriggerBot::CanTrigger(const CEntity& LocalEntity, const CEntity& TargetEnt
         return false;
 
 	// Check if weapon is ready
-	bool waitForNoAttack = false;
-	memoryManager.ReadMemory<bool>(LocalEntity.Pawn.Address + Offset.Pawn.m_bWaitForNoAttack, waitForNoAttack);
-
-    if (waitForNoAttack)
-        return false;
+	if (LocalEntity.Pawn.WaitForNoAttack)
+		return false;
 
     // Check weapon type
     std::string currentWeapon = GetWeapon(LocalEntity);

@@ -370,6 +370,7 @@ namespace GUI
 						PutSwitch(Text::ESP::HeadBox.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowHeadBox, true, "###HeadBoxCol", reinterpret_cast<float*>(&ESPConfig::HeadBoxColor));
 					PutSwitch(Text::ESP::Skeleton.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowBoneESP, true, "###BoneCol", reinterpret_cast<float*>(&ESPConfig::BoneColor));
 					PutSwitch(Text::ESP::BoneLabels.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowBoneLabels);
+					PutSwitch(Text::ESP::BoneDump.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::DumpBoneData);
 					PutSwitch(Text::ESP::HitboxBBox.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowHitboxBBox);
 					PutSwitch(Text::ESP::AimSamples.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowAimSamples);
 					PutSwitch(Text::ESP::SnapLine.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &ESPConfig::ShowLineToEnemy, true, "###LineCol", reinterpret_cast<float*>(&ESPConfig::LineToEnemyColor));
@@ -493,6 +494,8 @@ namespace GUI
 					static const float FovMin = 0.f, FovMax = 30.f, MinFovMax = 1.f;
 					static const int BulletMin = 0, BulletMax = 5;
 					static const float SmoothMin = 0.f, SmoothMax = 10.f;
+					static const float HeadOffsetMin = -5.f, HeadOffsetMax = 5.f;
+					static const float HeadDropOffsetMin = -5.f, HeadDropOffsetMax = 5.f;
 					static const int MinHumanize = 0;
 					static const int MaxHumanize = 15;
 					PutSwitch(Text::Aimbot::Enable.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7, &LegitBotConfig::AimBot);
@@ -524,7 +527,10 @@ namespace GUI
 
 						PutSliderFloat(Text::Aimbot::FovSlider.c_str(), 10.f, &AimControl::AimFov, &AimControl::AimFovMin, &FovMax, "%.1f");
 						PutSliderFloat(Text::Aimbot::FovMinSlider.c_str(), 10.f, &AimControl::AimFovMin, &FovMin, &MinFovMax, "%.2f");
+						PutSwitch(Text::Aimbot::FovMinDeadzone.c_str(), 10.f, ImGui::GetFrameHeight() * 1.7f, &AimControl::UseMinFovDeadzone);
 						PutSliderFloat(Text::Aimbot::SmoothSlider.c_str(), 10.f, &AimControl::Smooth, &SmoothMin, &SmoothMax, "%.1f", Text::Aimbot::OnlyAutoTip.c_str());
+						PutSliderFloat("Head Pull-Back", 10.f, &AimControl::HeadOffset, &HeadOffsetMin, &HeadOffsetMax, "%.1f", "Pull head aim point backward (+) or forward (-)");
+						PutSliderFloat("Head Drop", 10.f, &AimControl::HeadDropOffset, &HeadDropOffsetMin, &HeadDropOffsetMax, "%.1f", "Shift head aim point down toward neck (+) or up (-)");
 						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10.f);
 						ImGui::TextDisabled(Text::Aimbot::BoneList.c_str());
 
@@ -686,10 +692,14 @@ namespace GUI
 							ImGui::SetCursorScreenPos(ImVec2(BulletPos.x, BulletPos.y + 10));
 						}
 
-					ImGui::NewLine();
-					ImGui::GradientText("Triggerbot");
-					static const int DelayMin = 0, DelayMax = 300;
-					static const int DurationMin = 0, DurationMax = 1000;
+				ImGui::NewLine();
+				ImGui::GradientText("Triggerbot");
+				static const int DelayMin = 0, DelayMax = 300;
+				static const int DurationMin = 0, DurationMax = 1000;
+				static const int AdaptiveExtraMin = 0, AdaptiveExtraMax = 400;
+				static const int AdaptiveScaleMin = 0, AdaptiveScaleMax = 200;
+				static const int AdaptiveSuppMin = 0, AdaptiveSuppMax = 8;
+				static const int AdaptiveRecoveryMin = 25, AdaptiveRecoveryMax = 500;
 
 					PutSwitch(Text::Trigger::Enable.c_str(), 5.f, ImGui::GetFrameHeight() * 1.7, &LegitBotConfig::TriggerBot);
 					if (LegitBotConfig::TriggerBot)
@@ -714,6 +724,15 @@ namespace GUI
 						PutSwitch(Text::Trigger::TTDtimeout.c_str(), 5.f, ImGui::GetFrameHeight() * 1.7, &TriggerBot::TTDtimeout, false, NULL, NULL, Text::Aimbot::OnTip.c_str());
 						PutSliderInt(Text::Trigger::DelaySlider.c_str(), 5.f, &TriggerBot::TriggerDelay, &DelayMin, &DelayMax, "%d ms", Text::Trigger::DelayTip.c_str());
 						PutSliderInt(Text::Trigger::FakeShotSlider.c_str(), 5.f, &TriggerBot::ShotDuration, &DurationMin, &DurationMax, "%d ms");
+						PutSwitch(Text::Trigger::AdaptiveToggle.c_str(), 5.f, ImGui::GetFrameHeight() * 1.7, &TriggerBot::AdaptiveDelay, false, NULL, NULL, Text::Trigger::AdaptiveTip.c_str());
+						if (TriggerBot::AdaptiveDelay)
+						{
+							PutSliderInt(Text::Trigger::AdaptiveMax.c_str(), 5.f, &TriggerBot::AdaptiveMaxExtraDelay, &AdaptiveExtraMin, &AdaptiveExtraMax, "%d ms");
+							PutSliderInt(Text::Trigger::AdaptiveRecoil.c_str(), 5.f, &TriggerBot::AdaptiveRecoilScale, &AdaptiveScaleMin, &AdaptiveScaleMax, "%d ms/deg");
+							PutSliderInt(Text::Trigger::AdaptiveRamp.c_str(), 5.f, &TriggerBot::AdaptiveDerivativeScale, &AdaptiveScaleMin, &AdaptiveScaleMax, "%d ms/deg");
+							PutSliderInt(Text::Trigger::AdaptiveSuppression.c_str(), 5.f, &TriggerBot::AdaptiveSuppressionTicks, &AdaptiveSuppMin, &AdaptiveSuppMax, "%d ticks");
+							PutSliderInt(Text::Trigger::AdaptiveRecovery.c_str(), 5.f, &TriggerBot::AdaptiveRecoveryMs, &AdaptiveRecoveryMin, &AdaptiveRecoveryMax, "%d ms");
+						}
 					}
 
 					ImGui::Columns(1);

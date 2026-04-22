@@ -17,13 +17,13 @@ void AimControl::ClearDebugSamples()
 }
 
 void AimControl::AddDebugSample(const Vec3& worldPos, const Vec2& screenPos, AimSampleKind kind,
-    bool insideFov, bool visibilityOk, bool accepted)
+    bool insideFov, bool visibilityOk, bool accepted, int boneIndex)
 {
     if (!ESPConfig::ShowAimSamples)
         return;
     if (DebugSamples.size() >= DebugSampleLimit)
         return;
-    DebugSamples.push_back({ worldPos, screenPos, kind, insideFov, visibilityOk, accepted });
+    DebugSamples.push_back({ worldPos, screenPos, kind, boneIndex, insideFov, visibilityOk, accepted });
 }
 
 std::pair<float, float> AimControl::CalculateTargetOffset(const Vec2& ScreenPos, int ScreenCenterX, int ScreenCenterY)
@@ -142,6 +142,7 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos, std::vector<AimPoin
 	}
 
     float BestNorm = MAXV;
+    float BestRawNorm = MAXV;
     int BestTargetIndex = -1;
     int BestDamageScore = std::numeric_limits<int>::min();
     Vec2 Angles{ 0, 0 };
@@ -154,9 +155,10 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos, std::vector<AimPoin
 	const int ScreenCenterY = Gui.Window.Size.y / 2;
 	const bool enforceAimFov = AimControl::AimFov > 0.01f;
 	const float maxAimFov = enforceAimFov ? std::clamp(AimControl::AimFov, 0.1f, 179.f) : 0.f;
-	const float minAimFov = (enforceAimFov && AimControl::AimFovMin > 0.01f)
-		? std::min(AimControl::AimFovMin, maxAimFov)
-		: 0.f;
+    const float minAimFov = (enforceAimFov && AimControl::AimFovMin > 0.01f)
+        ? std::min(AimControl::AimFovMin, maxAimFov)
+        : 0.f;
+    const bool enforceDeadzone = AimControl::UseMinFovDeadzone && minAimFov > 0.f;
 
 	for (int i = 0; i < ListSize; ++i)
 	{
@@ -253,18 +255,46 @@ void AimControl::AimBot(const CEntity& Local, Vec3 LocalPos, std::vector<AimPoin
 			++invalidNorm;
 			continue;
 		}
-		if (enforceAimFov)
-		{
-			if (Norm > maxAimFov)
-				continue;
-			if (minAimFov > 0.f && Norm < minAimFov)
-				continue;
-		}
+        const bool hasScreen = AimPosList[i].HasScreenPos;
+        const bool insideScreenFov = hasScreen ? AimPosList[i].InsideScreenFov : false;
+        const bool insideScreenDeadzone = hasScreen ? AimPosList[i].InsideScreenDeadzone : false;
+
+        if (enforceAimFov)
+        {
+            if (hasScreen)
+            {
+                if (!insideScreenFov)
+                    continue;
+                if (enforceDeadzone && insideScreenDeadzone)
+                    continue;
+            }
+            else
+            {
+                if (Norm > maxAimFov)
+                    continue;
+                if (enforceDeadzone && Norm < minAimFov)
+                    continue;
+            }
+        }
+        else if (enforceDeadzone && hasScreen && insideScreenDeadzone)
+        {
+            continue;
+        }
+
+        float evalNorm = Norm;
+        if (hasScreen && enforceAimFov && maxAimFov > 0.0f)
+        {
+            const float ratio = std::clamp(AimPosList[i].ScreenDistRatio, 0.f, 1.f);
+            evalNorm = ratio * maxAimFov;
+        }
+        if (!enforceDeadzone && minAimFov > 0.f && evalNorm < minAimFov)
+            evalNorm = minAimFov;
 
         const int candidateDamage = AimPosList[i].DamageScore;
-        if (candidateDamage > BestDamageScore || (candidateDamage == BestDamageScore && Norm < BestNorm)) {
+        if (candidateDamage > BestDamageScore || (candidateDamage == BestDamageScore && evalNorm < BestNorm)) {
             BestDamageScore = candidateDamage;
-            BestNorm = Norm;
+            BestNorm = evalNorm;
+            BestRawNorm = Norm;
             BestTargetIndex = i;
         }
     }

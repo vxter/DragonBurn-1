@@ -96,6 +96,7 @@ public:
 	DWORD64 bSpottedByMask;
 	int fFlags;
 	float FlashDuration;
+	bool WaitForNoAttack;
 	//bool isDefusing;
 
 public:
@@ -117,6 +118,7 @@ public:
 	//bool GetDefusing();
 	bool GetFlashDuration();
 	bool GetVelocity();
+	bool GetWaitForNoAttack();
 
 	std::vector<short> GetWeaponInventory(DWORD64 entityList) const;
 

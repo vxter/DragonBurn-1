@@ -22,6 +22,7 @@ namespace Text {
         inline std::string FilledAlpha = "Filled Box Alpha";
         inline std::string Skeleton = "Skeleton";
         inline std::string BoneLabels = "Bone Labels";
+        inline std::string BoneDump = "Bone Data Dump";
         inline std::string HitboxBBox = "Hitbox Bounding Box";
         inline std::string AimSamples = "Aim Samples Overlay";
         inline std::string HeadBox = "Head ESP";
@@ -63,6 +64,7 @@ namespace Text {
         inline std::string FovSlider = "FOV: ";
         inline std::string HumanizationStrength = "Humanization Strength: ";
         inline std::string FovMinSlider = "MiniFOV: ";
+        inline std::string FovMinDeadzone = "Enforce MiniFOV";
         inline std::string SmoothSlider = "Smooth: ";
         inline std::string BoneList = "Hitboxes";
         inline std::string Tip = "Aimbot will not work while the menu is opened";
@@ -117,6 +119,13 @@ namespace Text {
         inline std::string VisCheck = "Visible Check";
         inline std::string DelayTip = "Using it try keep your TTD above 350ms";
         inline std::string TTDtimeout = "Wait min TTD";
+        inline std::string AdaptiveToggle = "Adaptive Delay";
+        inline std::string AdaptiveTip = "Adds recoil/suppression aware delay";
+        inline std::string AdaptiveMax = "Extra Delay Cap:";
+        inline std::string AdaptiveRecoil = "Recoil Weight:";
+        inline std::string AdaptiveRamp = "Ramp Weight:";
+        inline std::string AdaptiveSuppression = "Suppression Hold:";
+        inline std::string AdaptiveRecovery = "Recovery Speed:";
     }
 
     namespace Misc
